@@ -7,15 +7,15 @@
     </CustomSourceDirectories>
     <AutoProgramSPIFFSPartition>true</AutoProgramSPIFFSPartition>
     <ProjectModeSettings>
-      <ProjectGUID>2a0939ab-d7bf-47f5-9d3d-0b9eb9da2a9c</ProjectGUID>
+      <ProjectGUID>795054eb-e5e2-4acf-bce2-1b19403359a4</ProjectGUID>
       <GroupSourcesByTypes>true</GroupSourcesByTypes>
       <GroupSourcesByPaths>true</GroupSourcesByPaths>
-      <SketchSubdirectory>C:\Users\zoggi\OneDrive\Documents\Arduino\sketch_oct07a</SketchSubdirectory>
-      <MainSketchFile>sketch_oct07a.ino</MainSketchFile>
+      <SketchSubdirectory>sketches</SketchSubdirectory>
+      <MainSketchFile>DummyComputer.ino</MainSketchFile>
       <RootSketchFolder>
         <Subfolders />
         <Files>
-          <string>ct-1024_emulator.ino</string>
+          <string>DummyHost.ino</string>
         </Files>
       </RootSketchFolder>
       <OtherFiles />
@@ -150,7 +150,7 @@
             </KeyValue>
             <KeyValue>
               <Key>freq</Key>
-              <Value>125</Value>
+              <Value>133</Value>
             </KeyValue>
             <KeyValue>
               <Key>opt</Key>
