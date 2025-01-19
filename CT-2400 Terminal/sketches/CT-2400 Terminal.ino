@@ -1,4 +1,7 @@
 
+#define LF			0x0A
+#define CR			0x0D
+
 #define BAUD110     2
 #define BAUD150     3
 #define BAUD300     4
@@ -36,19 +39,22 @@
 
 bool wrapVertical = false;
 bool wrapHorizontal = true;
-
 bool useAC30Commands = false;
-
 bool hasLowercase = true;
 
 int baudRate = 300;
 
-int page = 0;
+struct Position
+{
+	int v;
+	int h;
+};
 
-char pages[PAGES][ROWS+1][COLUMNS+1];
-int posCol[PAGES];
-int posRow[PAGES];
-int firstRow[PAGES];
+// Buffer goes from 1 to ROWS/COLUMNS, so column and row 0 are ignored 
+char pageBuffer[PAGES][ROWS + 1][COLUMNS + 1];  
+int currentPageBuffer = 0;
+Position currentPageBufferPosition[PAGES];
+int firstRowOfPageBuffer[PAGES];
 
 int GetBaudRate()
 {
@@ -79,8 +85,403 @@ void SetupClock(int baudRate)
 	clock_configure_gpin(clk_peri, CLK_IN, baudRate*16, baudRate*16);
 }
 
+
+
+void GetCurrentScreenPosition(int& v, int& h)
+{
+	Serial.printf("%c[6n", 27);
+	String response = Serial.readStringUntil('R');
+	// ^[<v>;<h>R
+	v = response.substring(response.indexOf('[') + 1, response.indexOf(';')).toInt();
+	h = response.substring(response.indexOf(';') + 1, response.indexOf('R')).toInt();
+}
+
+void MoveCursor(int v, int h)
+{
+	Serial.printf("%c[%d;%dH", 27, v, h);
+}
+
+void MoveCursorRight()
+{
+	Serial.printf("%c[C", 27);
+}
+
+void MoveCursorLeft()
+{
+	Serial.printf("%c[D", 27);
+}
+
+void MoveCursorUp()
+{
+	Serial.printf("%c[A", 27);
+}
+
+void MoveCursorDown()
+{
+	Serial.printf("%c[B", 27);
+}
+
+void MoveCursorToHome()
+{
+	Serial.printf("%c[H", 27);
+}
+
+void EraseToEOL()
+{
+	Serial.printf("%c[K", 27);
+}
+
+void EraseToEOF()
+{
+	Serial.printf("%c[J", 27);
+}
+
+int GenerateRealRowPosition(int terminalRow)
+{	
+	return (((firstRowOfPageBuffer[currentPageBuffer] - 1) + (terminalRow - 1)) % ROWS) + 1;
+}
+
+void WriteCharactorToCurrentPageBuffer(char c)
+{
+	pageBuffer[currentPageBuffer][GenerateRealRowPosition(currentPageBufferPosition[currentPageBuffer].v)]
+		                         [currentPageBufferPosition[currentPageBuffer].h] = hasLowercase ? c : toupper(c);
+}
+
+void sendPulse(int pin)
+{
+	//Serial.println(clock_get_hz(clk_peri));
+	digitalWrite(pin, LOW);
+	delayMicroseconds(1);
+	digitalWrite(pin, HIGH);
+}
+
+
+bool CommandCursorRight(bool virtualMove = false, char c = '\0')
+{
+	int v, h;
+	GetCurrentScreenPosition(v, h);
+  
+	if (wrapVertical && wrapHorizontal && h == COLUMNS && v == ROWS)
+	{
+		if (c != '\0')
+		{
+			Serial.write(hasLowercase ? c : toupper(c));
+		}
+		MoveCursorToHome();
+		currentPageBufferPosition[currentPageBuffer].h = 1;
+		currentPageBufferPosition[currentPageBuffer].v = 1;
+		return true;
+	}
+	if (!wrapVertical && wrapHorizontal && h == COLUMNS && v == ROWS)
+	{
+		if (!virtualMove)
+			Serial.println();
+		currentPageBufferPosition[currentPageBuffer].h = 1;
+		
+		for (int i = 0; i <= COLUMNS; ++i)
+			pageBuffer[currentPageBuffer][firstRowOfPageBuffer[currentPageBuffer]][i] = ' ';
+		
+		firstRowOfPageBuffer[currentPageBuffer] = (((firstRowOfPageBuffer[currentPageBuffer] - 1) + 1) % ROWS) + 1;
+	}
+	else if (wrapHorizontal && h == COLUMNS && v != ROWS)
+	{
+		if (!virtualMove)
+			MoveCursor(v+1, 1);
+		currentPageBufferPosition[currentPageBuffer].h = 1;
+		currentPageBufferPosition[currentPageBuffer].v++;
+	}
+	else
+	{     
+		// Cursor right
+		if (!virtualMove)
+			MoveCursorRight();
+		currentPageBufferPosition[currentPageBuffer].h++;
+	}  
+	
+	return false;
+}
+
+bool CommandCursorDown(bool virtualMove = false, char c = '\0')
+{
+	int v, h;
+	GetCurrentScreenPosition(v, h);
+  
+	if (wrapVertical && v == ROWS)
+	{
+		MoveCursor(1, h);
+		currentPageBufferPosition[currentPageBuffer].h = 1;
+		currentPageBufferPosition[currentPageBuffer].v = 1;
+	}
+	else
+	{
+		// Cursor down
+		MoveCursorDown();
+		currentPageBufferPosition[currentPageBuffer].v++;
+	}
+	
+	return true;
+}
+
+bool CommandCursorLeft(bool virtualMove = false, char c = '\0')
+{
+	int v, h;
+	GetCurrentScreenPosition(v, h);
+  
+  if (wrapHorizontal && COLUMNS == 1)
+  {
+	  MoveCursor(v, COLUMNS);
+	  currentPageBufferPosition[currentPageBuffer].h = COLUMNS;
+	  
+  }
+  else
+  {
+    // Cursor left
+	  MoveCursorLeft();
+	  currentPageBufferPosition[currentPageBuffer].h--;
+  }
+	
+	return true;
+}
+
+bool CommandCursorUp(bool virtualMove = false, char c = '\0')
+{
+	int v, h;
+	GetCurrentScreenPosition(v, h);
+  
+  if (wrapVertical && v == 1)
+  {
+	  MoveCursor(ROWS, h);
+	  currentPageBufferPosition[currentPageBuffer].v = ROWS;
+  }
+  else
+  {
+    // Cursor up
+	  MoveCursorUp();
+	  currentPageBufferPosition[currentPageBuffer].v--;
+  }
+	
+	return true;
+}
+
+bool CommandHome(bool virtualMove = false, char c = '\0')
+{
+	Serial.printf("%c[H", 27);
+	currentPageBufferPosition[currentPageBuffer] = { 1, 1 };
+	
+	return true;
+}
+
+bool CommandEraseToEOL(bool virtualMove = false, char c = '\0')
+{
+	Serial.printf("%c[K", 27);
+	
+	return true;
+}
+
+bool CommandEraseToEOF(bool virtualMove = false, char c = '\0')
+{
+	Serial.printf("%c[J", 27);
+	
+	return true;
+}
+
+bool CommandReaderOn(bool virtualMove = false, char c = '\0')
+{
+	sendPulse(RDR_ON);
+	
+	return true;
+}
+
+bool CommandRecordOn(bool virtualMove = false, char c = '\0')
+{
+	sendPulse(REC_ON);
+	
+	return true;
+}
+
+bool CommandReaderOff(bool virtualMove = false, char c = '\0')
+{
+	sendPulse(RDR_OFF);
+	
+	return true;
+}
+
+bool CommandRecordOff(bool virtualMove = false, char c = '\0')
+{
+	sendPulse(REC_OFF);
+	
+	return true;
+}
+
+static bool(*CommandAssigment[2][8])(bool, char);
+
+void AssignCommands()
+{
+	// AC-30 Command Set
+	CommandAssigment[0][0] = CommandCursorRight; // ^P
+	CommandAssigment[0][1] = CommandCursorDown; // ^Q
+	CommandAssigment[0][2] = CommandCursorLeft; // ^R
+	CommandAssigment[0][3] = CommandHome; // ^S
+	CommandAssigment[0][4] = CommandEraseToEOL; // ^T
+	CommandAssigment[0][5] = CommandCursorUp; // ^U
+	CommandAssigment[0][6] = CommandEraseToEOF; // ^V
+	CommandAssigment[0][7] = nullptr; // ^W
+	
+	// Default Command Set
+	CommandAssigment[1][0] = CommandHome;		// ^P
+	CommandAssigment[1][1] = CommandReaderOn;	// ^Q
+	CommandAssigment[1][2] = CommandRecordOn;	// ^R
+	CommandAssigment[1][3] = CommandReaderOff;	// ^S
+	CommandAssigment[1][4] = CommandRecordOff;	// ^T
+	CommandAssigment[1][5] = CommandEraseToEOL;	// ^U
+	CommandAssigment[1][6] = CommandEraseToEOF;	// ^V
+	CommandAssigment[1][7] = CommandCursorRight;// ^W	
+}
+
+bool ProcessCommand(char c, bool receive = false)
+{
+	// Handle Commands
+	if (c >= 0x10 && c <= 0x17)
+	{
+		if (CommandAssigment[useAC30Commands == false ? 0 : 1][c - 0x10] != nullptr)
+			return CommandAssigment[useAC30Commands == false ? 0 : 1][c - 0x10](false, c);
+	}
+	
+	if (receive)
+	{
+		// Handle special characters
+		if (c == LF)
+		{
+			if (currentPageBufferPosition[currentPageBuffer].v != ROWS)
+			{
+				currentPageBufferPosition[currentPageBuffer].v += 1;
+			}
+			else if (wrapVertical && currentPageBufferPosition[currentPageBuffer].v == ROWS)
+			{
+				int v, h;
+				GetCurrentScreenPosition(v, h);
+
+				MoveCursor(1, h);
+				currentPageBufferPosition[currentPageBuffer].v = 1;
+			
+			}
+			return false;
+		}
+		else if (c == CR)
+		{
+			currentPageBufferPosition[currentPageBuffer].h = 1;
+			return false;
+		}
+		else if (c >= 0x21 && c <= 0x7e)
+		{
+			WriteCharactorToCurrentPageBuffer(c);
+			return CommandCursorRight(true, c);
+		}
+	}
+    
+	return false;
+}
+
+static bool eatNextLifeFeed = false;
+
+void ProcessReceivedByte(char c)
+{
+	if (c == 0x0D)
+	{
+		Serial.write(0x0D);
+		if (currentPageBufferPosition[currentPageBuffer].v != ROWS)
+		{
+			Serial.write(0x0A);
+			currentPageBufferPosition[currentPageBuffer].h = 1;
+			currentPageBufferPosition[currentPageBuffer].v += 1;
+		}
+		else if (wrapVertical && currentPageBufferPosition[currentPageBuffer].v == ROWS)
+		{
+			int v, h;
+			GetCurrentScreenPosition(v, h);
+
+			Serial.printf("%c[%d;%dH", 27, 1, h);
+			currentPageBufferPosition[currentPageBuffer].v = 1;
+			Serial.printf("%c[J", 27);
+		}
+		else if (!wrapVertical && currentPageBufferPosition[currentPageBuffer].v == ROWS)
+		{
+			Serial.write(0x0A);
+			currentPageBufferPosition[currentPageBuffer].h = 1;
+				
+			for (int i = 0; i <= COLUMNS; ++i)
+				pageBuffer[currentPageBuffer][firstRowOfPageBuffer[currentPageBuffer]][i] = ' ';
+				
+			firstRowOfPageBuffer[currentPageBuffer] = (((firstRowOfPageBuffer[currentPageBuffer] - 1) + 1) % ROWS) + 1;
+		}
+			
+		eatNextLifeFeed = true;
+		return;
+	}
+	else if (eatNextLifeFeed && c == 0x0A)
+	{
+		eatNextLifeFeed = false;
+		return;
+	}
+	else if (eatNextLifeFeed)
+	{
+		eatNextLifeFeed = false;
+	}
+		
+	bool eatCharacter = ProcessCommand(c, false);
+
+	if (!eatCharacter)
+		Serial.write(hasLowercase ? c : toupper(c));
+}
+
+void SwapPages()
+{
+	currentPageBuffer = (currentPageBuffer + 1) % PAGES;
+	if (wrapVertical)
+	{
+		MoveCursorToHome();
+		EraseToEOF();
+	}
+	else
+	{
+		MoveCursor(ROWS, 1);
+		Serial.println();
+	}
+		
+	for (int j = firstRowOfPageBuffer[currentPageBuffer]; j <= ROWS; ++j)
+		for (int k = 1; k <= COLUMNS; ++k)
+		{
+			Serial.print(pageBuffer[currentPageBuffer][j][k]);
+		}
+		
+	for (int j = 1; j <= firstRowOfPageBuffer[currentPageBuffer] - 1; ++j)
+		for (int k = 1; k <= COLUMNS; ++k)
+		{
+			Serial.print(pageBuffer[currentPageBuffer][j][k]);
+		}
+		
+	MoveCursor(currentPageBufferPosition[currentPageBuffer].v, currentPageBufferPosition[currentPageBuffer].h);
+}
+
+void ProcessSentByte(char c)
+{
+	bool eatCharacter = ProcessCommand(c, false);
+
+	if (!eatCharacter)
+	{
+		Serial1.write(hasLowercase ? c : toupper(c));
+	}	
+
+	if (digitalRead(LOCAL_ECHO) == LOW)
+	{
+		ProcessReceivedByte(c);	
+	}
+}
+
 void setup() {
 
+	AssignCommands();
+	
 	pinMode(BAUD110, INPUT_PULLUP);
 	pinMode(BAUD150, INPUT_PULLUP);
 	pinMode(BAUD300, INPUT_PULLUP);
@@ -99,7 +500,7 @@ void setup() {
 	pinMode(AC30_CMD, INPUT_PULLUP);
 	
 	pinMode(PAGE, INPUT_PULLUP);
-	page = digitalRead(PAGE) == HIGH ? 0 : 1;
+	currentPageBuffer = digitalRead(PAGE) == HIGH ? 0 : 1;
 
 	pinMode(REC_OFF, OUTPUT);
 	digitalWrite(REC_OFF, HIGH);
@@ -117,486 +518,48 @@ void setup() {
 	
 	SetupClock(baudRate);
 	
-	firstRow[0] = 1;
-	firstRow[1] = 1;
+	firstRowOfPageBuffer[0] = 1;
+	firstRowOfPageBuffer[1] = 1;
 	
 	for (int i = 0; i < PAGES; ++i)
 		for (int j = 1; j <= ROWS; ++j)
 			for (int k = 1; k <= COLUMNS; ++k)
-				pages[i][j][k] = ' ';
+				pageBuffer[i][j][k] = ' ';
 	
 	Serial1.begin(baudRate);
 	Serial.begin(115200);
 	
-    while(!Serial);
+	while (!Serial) ;
 	
-	posRow[0] = 1;
-	posCol[0] = 1;
-	posRow[1] = 1;
-	posCol[1] = 1;
+	currentPageBufferPosition[0] = { 1, 1 };
+	currentPageBufferPosition[1] = { 1, 1 };
 	
-	Serial.printf("%c[H", 27);
-	Serial.printf("%c[J", 27);
-	
+	MoveCursorToHome();
+	EraseToEOF();
 }
 
-int GenerateRealRowPosition(int terminalRow)
-{	
-	return (((firstRow[page] - 1) + (terminalRow - 1)) % ROWS) + 1;
-}
-
-bool moveCursorRight(bool virtualMove = false, char c = '\0')
+void loop() 
 {
-	Serial.printf("%c[6n", 27);
-	String response = Serial.readStringUntil('R');
-	// ^[<v>;<h>R
-	int  v = response.substring(response.indexOf('[')+1,response.indexOf(';')).toInt();
-	int h = response.substring(response.indexOf(';')+1,response.indexOf('R')).toInt();
-  
-	if (wrapVertical && wrapHorizontal && h == COLUMNS && v == ROWS)
-	{
-		if (c != '\0')
-		{
-			Serial.write(hasLowercase ? c : toupper(c));
-		}
-		Serial.printf("%c[H", 27);
-		if (c != '\0')
-			Serial.printf("%c[J", 27);
-		posCol[page] = 1;
-		posRow[page] = 1;
-		return true;
-	}
-	if (!wrapVertical && wrapHorizontal && h == COLUMNS && v == ROWS)
-	{
-		if (!virtualMove)
-			Serial.println();
-		posCol[page] = 1;
-		
-		for (int i = 0; i <= COLUMNS; ++i)
-			pages[page][firstRow[page]][i] = ' ';
-		
-		firstRow[page] = (((firstRow[page] - 1) + 1) % ROWS) + 1;
-	}
-	else if (wrapHorizontal && h == COLUMNS && v != ROWS)
-	{
-		if (!virtualMove)
-			Serial.printf("%c[%d;1H", 27, v+1);
-		posCol[page] = 1;
-		posRow[page]++;
-	}
-	else
-	{     
-		// Cursor right
-		if (!virtualMove)
-			Serial.printf("%c[C", 27);
-		posCol[page]++;
-	}  
-	
-	return false;
-}
-
-void moveCursorDown()
-{
-	Serial.printf("%c[6n", 27);
-	String response = Serial.readStringUntil('R');
-	// ^[<v>;<h>R
-	int  v = response.substring(response.indexOf('[')+1,response.indexOf(';')).toInt();
-	int h = response.substring(response.indexOf(';')+1,response.indexOf('R')).toInt();
-  
-	if (wrapVertical && v == ROWS)
-	{
-		Serial.printf("%c[1;%dH", 27, h);
-		posCol[page] = 1;
-		posRow[page] = 1;
-	}
-	else
-	{
-		// Cursor down
-		Serial.printf("%c[B", 27);
-		posRow[page]++;
-	}
-}
-
-void moveCursorLeft()
-{
-  Serial.printf("%c[6n", 27);
-  String response = Serial.readStringUntil('R');
-  // ^[<v>;<h>R
-  int  v = response.substring(response.indexOf('[')+1,response.indexOf(';')).toInt();
-  int h = response.substring(response.indexOf(';')+1,response.indexOf('R')).toInt();
-  
-  if (wrapHorizontal && COLUMNS == 1)
-  {
-	  Serial.printf("%c[%d;%dH", 27, v, COLUMNS);
-	  posCol[page] = COLUMNS;
-	  
-  }
-  else
-  {
-    // Cursor left
-    Serial.printf("%c[D", 27);
-	  posCol[page]--;
-  }
-}
-
-void moveCursorUp()
-{
-  Serial.printf("%c[6n", 27);
-  String response = Serial.readStringUntil('R');
-  // ^[<v>;<h>R
-  int  v = response.substring(response.indexOf('[')+1,response.indexOf(';')).toInt();
-  int h = response.substring(response.indexOf(';')+1,response.indexOf('R')).toInt();
-  
-  if (wrapVertical && v == 1)
-  {
-    Serial.printf("%c[%d;%dH", 27, ROWS, h);
-	  posRow[page] = ROWS;
-  }
-  else
-  {
-    // Cursor up
-    Serial.printf("%c[A", 27);
-	  posRow[page]--;
-  }
-}
-
-void sendPulse(int pin)
-{
-    //Serial.println(clock_get_hz(clk_peri));
-    digitalWrite(pin, LOW);
-    delayMicroseconds(1);
-    digitalWrite(pin, HIGH);
-}
-
-bool ProcessCharAC30(char c, bool receive = false)
-{
-	if (c == 0x10)  // ^P
-	{
-		// Home
-		Serial.printf("%c[H", 27);
-		posCol[page] = 1;
-		posRow[page] = 1;
-	}
-	else if (c == 0x11)  // ^Q
-	{
-		// Reader On
-		sendPulse(RDR_ON);
-	}
-	else if (c == 0x12)  // ^R
-	{
-		// Record On
-		sendPulse(REC_ON);
-	}
-	else if (c == 0x13)  // ^S
-	{
-		// Reader Off
-		sendPulse(RDR_OFF);
-	}
-	else if (c == 0x14) // ^T
-	{
-		// Record Off
-		sendPulse(REC_OFF);
-	}
-	else if (c == 0x15)  // ^U
-	{
-		// Erase to EOL
-		Serial.printf("%c[K", 27);
-	}
-	else if (c == 0x16) // ^V
-	{
-		// Erase to EOF
-		Serial.printf("%c[J", 27);
-	}
-	else if (c == 0x17) // ^W
-	{
-		// Cursor right
-		moveCursorRight();
-	}
-	else if (receive && c == 0x0A) // line feed
-	{
-		if (posRow[page] != ROWS)
-		{
-			posRow[page] += 1;
-		}
-		else if (wrapVertical && posRow[page] == ROWS )
-		{
-			Serial.printf("%c[6n", 27);
-			String response = Serial.readStringUntil('R');
-			// ^[<v>;<h>R
-			int  v = response.substring(response.indexOf('[') + 1, response.indexOf(';')).toInt();
-			int h = response.substring(response.indexOf(';') + 1, response.indexOf('R')).toInt();
-
-			Serial.printf("%c[%d;%dH", 27, 1, h);
-			posRow[page] = 1;
-			
-		}
-		return false;
-	}
-	else if (receive && c == 0x0D) // carriage return
-	{
-		posCol[page] = 1;
-		return false;
-	}
-	else if (receive && c >= 0x21 && c <= 0x7e)
-	{
-		pages[page][GenerateRealRowPosition(posRow[page])][posCol[page]] = hasLowercase ? c : toupper(c);
-		return moveCursorRight(true, c);
-	}
-	else // Do you intercept, or pass through
-	{
-		return false;
-	}
-
-	return true;
-}
-
-bool ProcessCharDefault(char c, bool receive = false)
-{
-	if (c == 0x10)  // ^P
-	{
-		moveCursorRight();
-	}
-	else if (c == 0x11)  // ^Q
-	{
-		moveCursorDown();
-	}
-	else if (c == 0x12)  // ^R
-	{
-		moveCursorLeft();
-	}
-	else if (c == 0x13)  // ^S
-	{
-		// Home
-		Serial.printf("%c[H", 27);
-		posCol[page] = 1;
-		posRow[page] = 1;
-	}
-	else if (c == 0x14) // ^T
-	{
-		// Erase to EOL
-		Serial.printf("%c[K", 27);
-	}
-	else if (c == 0x15)  // ^U
-	{
-		moveCursorUp();
-	}
-	else if (c == 0x16) // ^V
-	{
-		// Erase to EOF
-		Serial.printf("%c[J", 27);
-	}
-	//    else if (c == 0x17) // ^W
-	//    {
-	//      // Cursor right
-	//      Serial.printf("%c[C", 27);
-	//    }
-	else if (receive && c == 0x0A) // line feed
-	{
-		if (posRow[page] != ROWS)
-		{
-			posRow[page] += 1;
-		}
-		else if (wrapVertical && posRow[page] == ROWS )
-		{
-			Serial.printf("%c[6n", 27);
-			String response = Serial.readStringUntil('R');
-			// ^[<v>;<h>R
-			int  v = response.substring(response.indexOf('[') + 1, response.indexOf(';')).toInt();
-			int h = response.substring(response.indexOf(';') + 1, response.indexOf('R')).toInt();
-
-			Serial.printf("%c[%d;%dH", 27, 1, h);
-			posRow[page] = 1;
-			
-		}
-		return false;
-	}
-	else if (receive && c == 0x0D) // carriage return
-	{
-		posCol[page] = 1;
-		return false;
-	}
-	else if (receive && c >= 0x21 && c <= 0x7e)
-	{
-		pages[page][GenerateRealRowPosition(posRow[page])][posCol[page]] = hasLowercase ? c : toupper(c);
-		return moveCursorRight(true, c);
-	}
-    else // Do you intercept, or pass through
-    {
-      return false;
-    }
-
-    return true;
-}
-
-bool eatLineFeed = false;
-
-void loop() {
-
 	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
 	useAC30Commands = digitalRead(AC30_CMD) == LOW;
 	wrapVertical = digitalRead(SCROLL) == LOW;
 	
 	int currentPage = digitalRead(PAGE) == HIGH ? 0 : 1;
-	if (currentPage != page)
+	if (currentPage != currentPageBuffer)
 	{
-		page = (page + 1) % PAGES;
-		if (wrapVertical)
-		{
-			Serial.printf("%c[H", 27);
-			Serial.printf("%c[J", 27);
-		}
-		else
-		{
-			Serial.printf("%c[%d;1H", 27, ROWS);
-			Serial.println();
-		}
-		
-		for (int j = firstRow[page]; j <= ROWS; ++j)
-			for (int k = 1; k <= COLUMNS; ++k)
-			{
-				Serial.print(pages[page][j][k]);
-			}
-		
-		for (int j = 1; j <= firstRow[page] - 1; ++j)
-			for (int k = 1; k <= COLUMNS; ++k)
-			{
-				Serial.print(pages[page][j][k]);
-			}
-		
-		Serial.printf("%c[%d;%dH", 27, posRow[page], posCol[page]);
+		SwapPages();
 	}
 	
 	char c;
 	if (Serial.available()) 
 	{      
 		c = Serial.read();
-
-		bool retVal;
-		if (!useAC30Commands)
-			retVal = ProcessCharDefault(c);
-		else
-			retVal = ProcessCharAC30(c);
-
-		if (!retVal)
-		{
-			Serial1.write(hasLowercase ? c : toupper(c));
-		}	
-
-		if (digitalRead(LOCAL_ECHO) == LOW)
-		{
-			if (c == 0x0D)
-			{
-				Serial.write(0x0D);
-				if (posRow[page] != ROWS)
-				{
-					Serial.write(0x0A);
-					posRow[page] += 1;
-				}
-				else if (wrapVertical && posRow[page] == ROWS)
-				{
-					Serial.printf("%c[6n", 27);
-					String response = Serial.readStringUntil('R');
-					// ^[<v>;<h>R
-					int  v = response.substring(response.indexOf('[') + 1, response.indexOf(';')).toInt();
-					int h = response.substring(response.indexOf(';') + 1, response.indexOf('R')).toInt();
-
-					Serial.printf("%c[%d;%dH", 27, 1, h);
-					posRow[page] = 1;
-					Serial.printf("%c[J", 27);
-				}
-				else if (!wrapVertical && posRow[page] == ROWS)
-				{
-					Serial.write(0x0A);
-					posCol[page] = 1;
-					
-					for (int i = 0; i <= COLUMNS; ++i)
-						pages[page][firstRow[page]][i] = ' ';
-					
-					firstRow[page] = (((firstRow[page] - 1) + 1) % ROWS) + 1;
-				}
-			
-				eatLineFeed = true;
-				return;
-			}
-			else if (eatLineFeed && c == 0x0A)
-			{
-				eatLineFeed = false;
-				return;
-			}
-			else if (eatLineFeed)
-			{
-				eatLineFeed = false;
-			}
-		
-			bool retVal;
-
-			if (!useAC30Commands)
-				retVal = ProcessCharDefault(c, true); 
-			else
-				retVal = ProcessCharAC30(c);
-
-			if (!retVal)
-				Serial.write(hasLowercase ? c : toupper(c));		
-		}
+		ProcessSentByte(c);
 	}
 	
 	if (Serial1.available())
 	{
 		c = Serial1.read();
-	  
-		if (c == 0x0D)
-		{
-			Serial.write(0x0D);
-			if (posRow[page] != ROWS)
-			{
-				Serial.write(0x0A);
-				posCol[page] = 1;
-				posRow[page] += 1;
-			}
-			else if (wrapVertical && posRow[page] == ROWS)
-			{
-				Serial.printf("%c[6n", 27);
-				String response = Serial.readStringUntil('R');
-				// ^[<v>;<h>R
-				int  v = response.substring(response.indexOf('[') + 1, response.indexOf(';')).toInt();
-				int h = response.substring(response.indexOf(';') + 1, response.indexOf('R')).toInt();
-
-				Serial.printf("%c[%d;%dH", 27, 1, h);
-				posRow[page] = 1;
-				Serial.printf("%c[J", 27);
-			}
-			else if (!wrapVertical && posRow[page] == ROWS)
-			{
-				Serial.write(0x0A);
-				posCol[page] = 1;
-				
-				for (int i = 0; i <= COLUMNS; ++i)
-					pages[page][firstRow[page]][i] = ' ';
-				
-				firstRow[page] = (((firstRow[page] - 1) + 1) % ROWS) + 1;
-			}
-			
-			eatLineFeed = true;
-			return;
-		}
-		else if (eatLineFeed && c == 0x0A)
-		{
-			eatLineFeed = false;
-			return;
-		}
-		else if (eatLineFeed)
-		{
-			eatLineFeed = false;
-		}
-		
-		bool retVal;
-
-		if (!useAC30Commands)
-			retVal = ProcessCharDefault(c, true); 
-		else
-			retVal = ProcessCharAC30(c);
-
-		if (!retVal)
-			Serial.write(hasLowercase ? c : toupper(c));
+		ProcessReceivedByte(c);
 	}
 }
