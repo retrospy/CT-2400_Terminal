@@ -29,6 +29,8 @@
 #define CLK_IN      20
 #define CLK_OUT     21
 
+#define RESET		28
+
 // TeraTerm Default 80x24
 // CT-1024 32x16
 // CT-64 64x16
@@ -478,6 +480,8 @@ void ProcessSentByte(char c)
 	}
 }
 
+char startupMessage[3][COLUMNS];
+
 void setup() {
 
 	AssignCommands();
@@ -496,6 +500,7 @@ void setup() {
 	pinMode(LOCAL_ECHO, INPUT_PULLUP);
 	
 	pinMode(LOWER_CASE, INPUT_PULLUP);
+	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
 	
 	pinMode(AC30_CMD, INPUT_PULLUP);
 	
@@ -514,6 +519,8 @@ void setup() {
 	pinMode(RDR_ON, OUTPUT);
 	digitalWrite(RDR_ON, HIGH);
 	
+	pinMode(RESET, INPUT_PULLUP);
+	
 	int baudRate = GetBaudRate();
 	
 	SetupClock(baudRate);
@@ -521,25 +528,64 @@ void setup() {
 	firstRowOfPageBuffer[0] = 1;
 	firstRowOfPageBuffer[1] = 1;
 	
+			                 // 12345678901234567890123456789012345678901234567890123456789012345678901234567890
+	strncpy(startupMessage[0], "                    ******  RetroSpy Technologies  ******                       ", 80);
+	strncpy(startupMessage[1], "                                   CT-2400                                      ", 80);
+	strncpy(startupMessage[2], "                               Terminal System                                  ", 80);
+	
 	for (int i = 0; i < PAGES; ++i)
 		for (int j = 1; j <= ROWS; ++j)
 			for (int k = 1; k <= COLUMNS; ++k)
-				pageBuffer[i][j][k] = ' ';
+			{
+				if (i == currentPageBuffer)
+				{
+					if (j == 1)
+						pageBuffer[i][j][k] = hasLowercase ? startupMessage[0][k] : toupper(startupMessage[0][k]);		
+					else if (j == 3)
+						pageBuffer[i][j][k] = hasLowercase ? startupMessage[1][k] : toupper(startupMessage[1][k]);	
+					else if (j == 5)
+						pageBuffer[i][j][k] = hasLowercase ? startupMessage[2][k] : toupper(startupMessage[2][k]);
+					else
+					{
+						pageBuffer[i][j][k] = ' ';					
+					}
+				}
+				else
+				{
+					pageBuffer[i][j][k] = ' ';	
+				}
+			}
+	
+	currentPageBufferPosition[0] = { 1, 1 };
+	currentPageBufferPosition[1] = { 1, 1 };
 	
 	Serial1.begin(baudRate);
 	Serial.begin(115200);
 	
 	while (!Serial) ;
 	
-	currentPageBufferPosition[0] = { 1, 1 };
-	currentPageBufferPosition[1] = { 1, 1 };
-	
 	MoveCursorToHome();
 	EraseToEOF();
+	
+	for (int j = 1; j <= ROWS; ++j)
+		for (int k = 1; k <= COLUMNS; ++k)
+		{
+			Serial.print(pageBuffer[currentPageBuffer][j][k]);
+		}
+	
+	MoveCursor(7, 1);
+	currentPageBufferPosition[currentPageBuffer] = { 7, 1 };
 }
 
 void loop() 
 {
+	if (digitalRead(RESET) == LOW)
+	{
+		MoveCursorToHome();
+		EraseToEOF();
+		*((volatile uint32_t*)(PPB_BASE + 0x0ED0C)) = 0x5FA0004;
+	}
+	
 	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
 	useAC30Commands = digitalRead(AC30_CMD) == LOW;
 	wrapVertical = digitalRead(SCROLL) == LOW;
