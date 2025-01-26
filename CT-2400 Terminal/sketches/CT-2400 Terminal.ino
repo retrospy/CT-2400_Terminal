@@ -388,12 +388,12 @@ static bool eatNextLifeFeed = false;
 
 void ProcessReceivedByte(char c)
 {
-	if (c == 0x0D)
+	if (c == CR)
 	{
-		Serial.write(0x0D);
+		Serial.write(CR);
 		if (currentPageBufferPosition[currentPageBuffer].v != ROWS)
 		{
-			Serial.write(0x0A);
+			Serial.write(LF);
 			currentPageBufferPosition[currentPageBuffer].h = 1;
 			currentPageBufferPosition[currentPageBuffer].v += 1;
 		}
@@ -402,13 +402,13 @@ void ProcessReceivedByte(char c)
 			int v, h;
 			GetCurrentScreenPosition(v, h);
 
-			Serial.printf("%c[%d;%dH", 27, 1, h);
+			MoveCursor(1, h);
 			currentPageBufferPosition[currentPageBuffer].v = 1;
-			Serial.printf("%c[J", 27);
+			CommandEraseToEOF();
 		}
 		else if (!wrapVertical && currentPageBufferPosition[currentPageBuffer].v == ROWS)
 		{
-			Serial.write(0x0A);
+			Serial.write(LF);
 			currentPageBufferPosition[currentPageBuffer].h = 1;
 				
 			for (int i = 0; i <= COLUMNS; ++i)
@@ -420,7 +420,7 @@ void ProcessReceivedByte(char c)
 		eatNextLifeFeed = true;
 		return;
 	}
-	else if (eatNextLifeFeed && c == 0x0A)
+	else if (eatNextLifeFeed && c == LF)
 	{
 		eatNextLifeFeed = false;
 		return;
@@ -433,7 +433,7 @@ void ProcessReceivedByte(char c)
 	bool eatCharacter = ProcessCommand(c, false);
 
 	if (!eatCharacter)
-		Serial.write(hasLowercase ? c : toupper(c));
+		Serial.write(hasLowercase ? (c & 0x7F) : toupper(c & 0x7F));
 }
 
 void SwapPages()
