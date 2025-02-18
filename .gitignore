@@ -400,3 +400,5 @@ FodyWeavers.xsd
 /.visualgdb
 /CT-2400 Terminal/.visualgdb
 /DummyHost/.visualgdb/VisualGDBCache
+/CT-2400_Terminal/.visualgdb
+/CT-2400_Terminal_New/.visualgdb/VisualGDBCache/CT-2400_Terminal_New-Debug-Raspberry_Pi_Pico

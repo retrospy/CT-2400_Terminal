@@ -17,7 +17,7 @@
 
 #define LOWER_CASE  9
 
-#define AC30_CMD	11
+#define AC30_CMD	10
 
 #define PAGE        27
 
@@ -76,15 +76,16 @@ int GetBaudRate()
 		return 4800 ;
 	else
 		return 9600;
-};
+}
+;
 
 void SetupClock(int baudRate)
 { 
 	
-	analogWriteFreq(baudRate*16);
+	analogWriteFreq(baudRate * 16);
 	analogWrite(CLK_OUT, 128);
 	
-	clock_configure_gpin(clk_peri, CLK_IN, baudRate*16, baudRate*16);
+	clock_configure_gpin(clk_peri, CLK_IN, baudRate * 16, baudRate * 16);
 }
 
 
@@ -145,6 +146,11 @@ int GenerateRealRowPosition(int terminalRow)
 
 void WriteCharactorToCurrentPageBuffer(char c)
 {
+	Serial.print("V=");
+	Serial.println(GenerateRealRowPosition(currentPageBufferPosition[currentPageBuffer].v));
+	Serial.print("H=");
+	Serial.println(currentPageBufferPosition[currentPageBuffer].h);
+		
 	pageBuffer[currentPageBuffer][GenerateRealRowPosition(currentPageBufferPosition[currentPageBuffer].v)]
 		                         [currentPageBufferPosition[currentPageBuffer].h] = hasLowercase ? c : toupper(c);
 }
@@ -174,21 +180,22 @@ bool CommandCursorRight(bool virtualMove = false, char c = '\0')
 		currentPageBufferPosition[currentPageBuffer].v = 1;
 		return true;
 	}
+	
 	if (!wrapVertical && wrapHorizontal && h == COLUMNS && v == ROWS)
 	{
 		if (!virtualMove)
 			Serial.println();
 		currentPageBufferPosition[currentPageBuffer].h = 1;
 		
-		for (int i = 0; i <= COLUMNS; ++i)
-			pageBuffer[currentPageBuffer][firstRowOfPageBuffer[currentPageBuffer]][i] = ' ';
+		//for (int i = 0; i <= COLUMNS; ++i)
+		//	pageBuffer[currentPageBuffer][firstRowOfPageBuffer[currentPageBuffer]][i] = ' ';
 		
 		firstRowOfPageBuffer[currentPageBuffer] = (((firstRowOfPageBuffer[currentPageBuffer] - 1) + 1) % ROWS) + 1;
 	}
 	else if (wrapHorizontal && h == COLUMNS && v != ROWS)
 	{
 		if (!virtualMove)
-			MoveCursor(v+1, 1);
+			MoveCursor(v + 1, 1);
 		currentPageBufferPosition[currentPageBuffer].h = 1;
 		currentPageBufferPosition[currentPageBuffer].v++;
 	}
@@ -201,6 +208,40 @@ bool CommandCursorRight(bool virtualMove = false, char c = '\0')
 	}  
 	
 	return false;
+}
+
+bool CommandCursorRight_new(bool virtualMove = false, char c = '\0')
+{
+	int v, h;
+	GetCurrentScreenPosition(v, h);
+  
+	if (wrapVertical && wrapHorizontal && h == COLUMNS && v == ROWS)
+	{
+		MoveCursorToHome();
+		currentPageBufferPosition[currentPageBuffer].h = 1;
+		currentPageBufferPosition[currentPageBuffer].v = 1;
+	}
+	else if (!wrapVertical && wrapHorizontal && h == COLUMNS && v == ROWS)
+	{
+		Serial.println();
+		currentPageBufferPosition[currentPageBuffer].h = 1;
+		
+		firstRowOfPageBuffer[currentPageBuffer] = (((firstRowOfPageBuffer[currentPageBuffer] - 1) + 1) % ROWS) + 1;
+	}
+	else if (wrapHorizontal && h == COLUMNS && v != ROWS)
+	{
+		MoveCursor(v + 1, 1);
+		currentPageBufferPosition[currentPageBuffer].h = 1;
+		currentPageBufferPosition[currentPageBuffer].v++;		
+	}
+	else
+	{     
+		// Cursor right
+		MoveCursorRight();
+		currentPageBufferPosition[currentPageBuffer].h++;
+	}  
+	
+	return true;
 }
 
 bool CommandCursorDown(bool virtualMove = false, char c = '\0')
@@ -229,18 +270,18 @@ bool CommandCursorLeft(bool virtualMove = false, char c = '\0')
 	int v, h;
 	GetCurrentScreenPosition(v, h);
   
-  if (wrapHorizontal && COLUMNS == 1)
-  {
-	  MoveCursor(v, COLUMNS);
-	  currentPageBufferPosition[currentPageBuffer].h = COLUMNS;
+	if (wrapHorizontal && COLUMNS == 1)
+	{
+		MoveCursor(v, COLUMNS);
+		currentPageBufferPosition[currentPageBuffer].h = COLUMNS;
 	  
-  }
-  else
-  {
-    // Cursor left
-	  MoveCursorLeft();
-	  currentPageBufferPosition[currentPageBuffer].h--;
-  }
+	}
+	else
+	{
+		// Cursor left
+		MoveCursorLeft();
+		currentPageBufferPosition[currentPageBuffer].h--;
+	}
 	
 	return true;
 }
@@ -250,17 +291,17 @@ bool CommandCursorUp(bool virtualMove = false, char c = '\0')
 	int v, h;
 	GetCurrentScreenPosition(v, h);
   
-  if (wrapVertical && v == 1)
-  {
-	  MoveCursor(ROWS, h);
-	  currentPageBufferPosition[currentPageBuffer].v = ROWS;
-  }
-  else
-  {
-    // Cursor up
-	  MoveCursorUp();
-	  currentPageBufferPosition[currentPageBuffer].v--;
-  }
+	if (wrapVertical && v == 1)
+	{
+		MoveCursor(ROWS, h);
+		currentPageBufferPosition[currentPageBuffer].v = ROWS;
+	}
+	else
+	{
+		// Cursor up
+		MoveCursorUp();
+		currentPageBufferPosition[currentPageBuffer].v--;
+	}
 	
 	return true;
 }
@@ -319,8 +360,8 @@ static bool(*CommandAssigment[2][8])(bool, char);
 
 void AssignCommands()
 {
-	// AC-30 Command Set
-	CommandAssigment[0][0] = CommandCursorRight; // ^P
+	// Default Command Set
+	CommandAssigment[0][0] = CommandCursorRight_new; // ^P
 	CommandAssigment[0][1] = CommandCursorDown; // ^Q
 	CommandAssigment[0][2] = CommandCursorLeft; // ^R
 	CommandAssigment[0][3] = CommandHome; // ^S
@@ -328,16 +369,22 @@ void AssignCommands()
 	CommandAssigment[0][5] = CommandCursorUp; // ^U
 	CommandAssigment[0][6] = CommandEraseToEOF; // ^V
 	CommandAssigment[0][7] = nullptr; // ^W
-	
-	// Default Command Set
-	CommandAssigment[1][0] = CommandHome;		// ^P
-	CommandAssigment[1][1] = CommandReaderOn;	// ^Q
-	CommandAssigment[1][2] = CommandRecordOn;	// ^R
-	CommandAssigment[1][3] = CommandReaderOff;	// ^S
-	CommandAssigment[1][4] = CommandRecordOff;	// ^T
-	CommandAssigment[1][5] = CommandEraseToEOL;	// ^U
-	CommandAssigment[1][6] = CommandEraseToEOF;	// ^V
-	CommandAssigment[1][7] = CommandCursorRight;// ^W	
+
+	// AC-30 Command Set
+	CommandAssigment[1][0] = CommandHome; // ^P
+	CommandAssigment[1][1] = CommandReaderOn; // ^Q
+	CommandAssigment[1][2] = CommandRecordOn; // ^R
+	CommandAssigment[1][3] = CommandReaderOff; // ^S
+	CommandAssigment[1][4] = CommandRecordOff; // ^T
+	CommandAssigment[1][5] = CommandEraseToEOL; // ^U
+	CommandAssigment[1][6] = CommandEraseToEOF; // ^V
+	CommandAssigment[1][7] = CommandCursorRight_new; // ^W	
+}
+
+void ProcessCommand_New(char c)
+{
+	if (CommandAssigment[useAC30Commands == false ? 0 : 1][c - 0x10] != nullptr)
+		CommandAssigment[useAC30Commands == false ? 0 : 1][c - 0x10](false, c);
 }
 
 bool ProcessCommand(char c, bool receive = false)
@@ -351,30 +398,7 @@ bool ProcessCommand(char c, bool receive = false)
 	
 	if (receive)
 	{
-		// Handle special characters
-		if (c == LF)
-		{
-			if (currentPageBufferPosition[currentPageBuffer].v != ROWS)
-			{
-				currentPageBufferPosition[currentPageBuffer].v += 1;
-			}
-			else if (wrapVertical && currentPageBufferPosition[currentPageBuffer].v == ROWS)
-			{
-				int v, h;
-				GetCurrentScreenPosition(v, h);
-
-				MoveCursor(1, h);
-				currentPageBufferPosition[currentPageBuffer].v = 1;
-			
-			}
-			return false;
-		}
-		else if (c == CR)
-		{
-			currentPageBufferPosition[currentPageBuffer].h = 1;
-			return false;
-		}
-		else if (c >= 0x21 && c <= 0x7e)
+		if (c >= 0x21 && c <= 0x7e)
 		{
 			WriteCharactorToCurrentPageBuffer(c);
 			return CommandCursorRight(true, c);
@@ -385,16 +409,23 @@ bool ProcessCommand(char c, bool receive = false)
 }
 
 static bool eatNextLifeFeed = false;
-
+ 
 void ProcessReceivedByte(char c)
 {
+	//Serial.print("Receiving: ");
+	//Serial.println(c, HEX);
+	
 	if (c == CR)
 	{
 		Serial.write(CR);
+		currentPageBufferPosition[currentPageBuffer].h = 1;
+		return;
+	}
+	else if (c == LF)
+	{
 		if (currentPageBufferPosition[currentPageBuffer].v != ROWS)
 		{
 			Serial.write(LF);
-			currentPageBufferPosition[currentPageBuffer].h = 1;
 			currentPageBufferPosition[currentPageBuffer].v += 1;
 		}
 		else if (wrapVertical && currentPageBufferPosition[currentPageBuffer].v == ROWS)
@@ -404,36 +435,23 @@ void ProcessReceivedByte(char c)
 
 			MoveCursor(1, h);
 			currentPageBufferPosition[currentPageBuffer].v = 1;
-			CommandEraseToEOF();
 		}
 		else if (!wrapVertical && currentPageBufferPosition[currentPageBuffer].v == ROWS)
 		{
 			Serial.write(LF);
-			currentPageBufferPosition[currentPageBuffer].h = 1;
-				
-			for (int i = 0; i <= COLUMNS; ++i)
-				pageBuffer[currentPageBuffer][firstRowOfPageBuffer[currentPageBuffer]][i] = ' ';
 				
 			firstRowOfPageBuffer[currentPageBuffer] = (((firstRowOfPageBuffer[currentPageBuffer] - 1) + 1) % ROWS) + 1;
 		}
-			
-		eatNextLifeFeed = true;
 		return;
-	}
-	else if (eatNextLifeFeed && c == LF)
-	{
-		eatNextLifeFeed = false;
-		return;
-	}
-	else if (eatNextLifeFeed)
-	{
-		eatNextLifeFeed = false;
 	}
 		
-	bool eatCharacter = ProcessCommand(c, false);
+	if (c >= 0x10 && c <= 0x17)
+		ProcessCommand_New(c);
+	else if (c >= 0x21 && c <= 0x7e)
+	{
+		WriteCharactorToCurrentPageBuffer(c);
 
-	if (!eatCharacter)
-		Serial.write(hasLowercase ? (c & 0x7F) : toupper(c & 0x7F));
+	}
 }
 
 void SwapPages()
@@ -471,10 +489,12 @@ void ProcessSentByte(char c)
 
 	if (!eatCharacter)
 	{
+		//Serial.print("Sending: ");
+		//Serial.println(c, HEX);
 		Serial1.write(hasLowercase ? c : toupper(c));
 	}	
 
-	if (digitalRead(LOCAL_ECHO) == LOW)
+	if (digitalRead(LOCAL_ECHO) == HIGH)
 	{
 		ProcessReceivedByte(c);	
 	}
@@ -528,7 +548,7 @@ void setup() {
 	firstRowOfPageBuffer[0] = 1;
 	firstRowOfPageBuffer[1] = 1;
 	
-			                 // 12345678901234567890123456789012345678901234567890123456789012345678901234567890
+	                         // 12345678901234567890123456789012345678901234567890123456789012345678901234567890
 	strncpy(startupMessage[0], "                    ******  RetroSpy Technologies  ******                       ", 80);
 	strncpy(startupMessage[1], "                                   CT-2400                                      ", 80);
 	strncpy(startupMessage[2], "                               Terminal System                                  ", 80);
@@ -587,7 +607,7 @@ void loop()
 	}
 	
 	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
-	useAC30Commands = digitalRead(AC30_CMD) == LOW;
+	useAC30Commands = digitalRead(AC30_CMD) == HIGH;
 	wrapVertical = digitalRead(SCROLL) == LOW;
 	
 	int currentPage = digitalRead(PAGE) == HIGH ? 0 : 1;
