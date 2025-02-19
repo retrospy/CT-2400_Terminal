@@ -5,7 +5,7 @@ VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{803FD0C6-D64E-4E16-9DC3-1DAEC859A3D2}") = "DummyHost", "DummyHost\DummyHost.vgdbproj", "{795054EB-E5E2-4ACF-BCE2-1B19403359A4}"
 EndProject
-Project("{803FD0C6-D64E-4E16-9DC3-1DAEC859A3D2}") = "CT-2400_Terminal_New", "CT-2400_Terminal_New\CT-2400_Terminal_New.vgdbproj", "{4E812128-C11F-4B6B-840D-91D37F85DB58}"
+Project("{803FD0C6-D64E-4E16-9DC3-1DAEC859A3D2}") = "CT-2400_Terminal", "CT-2400_Terminal\CT-2400_Terminal.vgdbproj", "{4E812128-C11F-4B6B-840D-91D37F85DB58}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

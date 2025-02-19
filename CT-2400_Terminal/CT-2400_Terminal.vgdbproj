@@ -7,11 +7,11 @@
     </CustomSourceDirectories>
     <AutoProgramSPIFFSPartition>true</AutoProgramSPIFFSPartition>
     <ProjectModeSettings>
-      <ProjectGUID>2a0939ab-d7bf-47f5-9d3d-0b9eb9da2a9c</ProjectGUID>
+      <ProjectGUID>4e812128-c11f-4b6b-840d-91d37f85db58</ProjectGUID>
       <GroupSourcesByTypes>true</GroupSourcesByTypes>
       <GroupSourcesByPaths>true</GroupSourcesByPaths>
-      <SketchSubdirectory>E:\src\Repos\retrospy\ct-1024_emulator\CT-2400 Terminal\sketches</SketchSubdirectory>
-      <MainSketchFile>sketch_oct07a.ino</MainSketchFile>
+      <SketchSubdirectory>sketches</SketchSubdirectory>
+      <MainSketchFile>CT-2400_Terminal_New.ino</MainSketchFile>
       <RootSketchFolder>
         <Subfolders />
         <Files>
@@ -44,14 +44,6 @@
     <PostDebugActions />
     <DebugStopActions />
     <BreakMode>Default</BreakMode>
-    <CustomBreakCommand>
-      <SkipWhenRunningCommandList>false</SkipWhenRunningCommandList>
-      <RemoteHost>
-        <HostName>BuildMachine</HostName>
-        <Transport>BuiltinShortcut</Transport>
-      </RemoteHost>
-      <BackgroundMode xsi:nil="true" />
-    </CustomBreakCommand>
   </CustomDebug>
   <CustomShortcuts>
     <Shortcuts />
@@ -60,91 +52,22 @@
   <UserDefinedVariables />
   <ImportedPropertySheets />
   <CodeSense>
-    <Enabled>True</Enabled>
+    <Enabled>Unknown</Enabled>
     <ExtraSettings>
       <HideErrorsInSystemHeaders>true</HideErrorsInSystemHeaders>
       <SupportLightweightReferenceAnalysis>true</SupportLightweightReferenceAnalysis>
-      <DiscoverySettings>
-        <Mode>Enabled</Mode>
-        <SearchInProjectDir>true</SearchInProjectDir>
-        <SearchInSourceDirs>true</SearchInSourceDirs>
-        <SearchInIncludeSubdirs>true</SearchInIncludeSubdirs>
-      </DiscoverySettings>
       <CheckForClangFormatFiles>true</CheckForClangFormatFiles>
       <FormattingEngine xsi:nil="true" />
     </ExtraSettings>
     <CodeAnalyzerSettings>
       <Enabled>false</Enabled>
-      <SelectedAnalyzers>
-        <string>apiModeling.Errno</string>
-        <string>apiModeling.google.GTest</string>
-        <string>apiModeling.llvm.CastValue</string>
-        <string>apiModeling.llvm.ReturnValue</string>
-        <string>apiModeling.StdCLibraryFunctions</string>
-        <string>apiModeling.TrustNonnull</string>
-        <string>apiModeling.TrustReturnsNonnull</string>
-        <string>core.builtin.BuiltinFunctions</string>
-        <string>core.builtin.NoReturnFunctions</string>
-        <string>core.CallAndMessage</string>
-        <string>core.CallAndMessageModeling</string>
-        <string>core.DivideZero</string>
-        <string>core.DynamicTypePropagation</string>
-        <string>core.NonnilStringConstants</string>
-        <string>core.NonNullParamChecker</string>
-        <string>core.NullDereference</string>
-        <string>core.StackAddrEscapeBase</string>
-        <string>core.StackAddressEscape</string>
-        <string>core.UndefinedBinaryOperatorResult</string>
-        <string>core.uninitialized.ArraySubscript</string>
-        <string>core.uninitialized.Assign</string>
-        <string>core.uninitialized.Branch</string>
-        <string>core.uninitialized.CapturedBlockVariable</string>
-        <string>core.uninitialized.NewArraySize</string>
-        <string>core.uninitialized.UndefReturn</string>
-        <string>core.VLASize</string>
-        <string>cplusplus.InnerPointer</string>
-        <string>cplusplus.Move</string>
-        <string>cplusplus.NewDelete</string>
-        <string>cplusplus.NewDeleteLeaks</string>
-        <string>cplusplus.PlacementNew</string>
-        <string>cplusplus.PureVirtualCall</string>
-        <string>cplusplus.SelfAssignment</string>
-        <string>cplusplus.SmartPtrModeling</string>
-        <string>cplusplus.StringChecker</string>
-        <string>cplusplus.VirtualCallModeling</string>
-        <string>deadcode.DeadStores</string>
-        <string>nullability.NullPassedToNonnull</string>
-        <string>nullability.NullReturnedFromNonnull</string>
-        <string>security.insecureAPI.getpw</string>
-        <string>security.insecureAPI.gets</string>
-        <string>security.insecureAPI.mkstemp</string>
-        <string>security.insecureAPI.mktemp</string>
-        <string>security.insecureAPI.UncheckedReturn</string>
-        <string>security.insecureAPI.vfork</string>
-        <string>unix.API</string>
-        <string>unix.cstring.BadSizeArg</string>
-        <string>unix.cstring.CStringModeling</string>
-        <string>unix.cstring.NullArg</string>
-        <string>unix.DynamicMemoryModeling</string>
-        <string>unix.Malloc</string>
-        <string>unix.MallocSizeof</string>
-        <string>unix.MismatchedDeallocator</string>
-        <string>unix.Vfork</string>
-      </SelectedAnalyzers>
-      <ExtraArguments>
-        <string />
-      </ExtraArguments>
     </CodeAnalyzerSettings>
   </CodeSense>
   <Configurations>
     <VisualGDBConfiguration>
       <PlatformName>Raspberry_Pi_Pico</PlatformName>
       <DebugSettingsOverride xsi:type="com.visualgdb.debug.embedded">
-        <AdditionalStartupCommands>
-          <GDBPreStartupCommands />
-          <GDBStartupCommands />
-          <GDBFinalizationCommands />
-        </AdditionalStartupCommands>
+        <AdditionalStartupCommands />
         <AdditionalGDBSettings>
           <Features>
             <DisableAutoDetection>false</DisableAutoDetection>
@@ -202,7 +125,6 @@
         <SoftwareTracingSettings>
           <TraceWhileDebugging>true</TraceWhileDebugging>
           <AutoStart>false</AutoStart>
-          <StaticTracePrograms xsi:type="InsideWorkArea" />
           <DynamicProgramAreaSize>0</DynamicProgramAreaSize>
           <SkipInitiallyDisabledTracepoints>false</SkipInitiallyDisabledTracepoints>
           <TraceProgramOptimization>Size</TraceProgramOptimization>
@@ -211,22 +133,14 @@
           <InstrumentWithNoFeasibleTracepoints>false</InstrumentWithNoFeasibleTracepoints>
           <MaximumStringLength>255</MaximumStringLength>
           <DeferVectorTablePatching>true</DeferVectorTablePatching>
-          <ShowAdvancedConfiguration>true</ShowAdvancedConfiguration>
+          <ShowAdvancedConfiguration>false</ShowAdvancedConfiguration>
           <WorkAreaSize>4096</WorkAreaSize>
           <DisableLiveCodePatching>false</DisableLiveCodePatching>
         </SoftwareTracingSettings>
-        <RelatedExecutables>
-          <RelatedExecutable>
-            <Program>false</Program>
-            <LoadSymbols>false</LoadSymbols>
-            <ShowInLiveWatch>false</ShowInLiveWatch>
-          </RelatedExecutable>
-        </RelatedExecutables>
         <CheckInterfaceDrivers>true</CheckInterfaceDrivers>
       </DebugSettingsOverride>
       <BuildSettingsExtension xsi:type="com.visualgdb.build.external.arduino.extension">
         <BoardID>rp2040:rp2040:rpipico</BoardID>
-        <COMPort />
         <Properties>
           <Entries>
             <KeyValue>
@@ -235,7 +149,7 @@
             </KeyValue>
             <KeyValue>
               <Key>freq</Key>
-              <Value>125</Value>
+              <Value>133</Value>
             </KeyValue>
             <KeyValue>
               <Key>opt</Key>
