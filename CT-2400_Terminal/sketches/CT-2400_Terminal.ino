@@ -81,10 +81,11 @@ int GetBaudRate()
 
 void SetupClock(int baudRate)
 { 
-	
+	pinMode(CLK_OUT, OUTPUT);
 	analogWriteFreq(baudRate * 16);
-	analogWrite(CLK_OUT, 128);
+	analogWriteResolution(8);
 	
+	analogWrite(CLK_OUT, 128);
 	clock_configure_gpin(clk_peri, CLK_IN, baudRate * 16, baudRate * 16);
 }
 
@@ -376,8 +377,8 @@ static bool eatNextLifeFeed = false;
  
 void ProcessReceivedByte(char c)
 {
-	//Serial.print("Receiving: ");
-	//Serial.println(c, HEX);
+	Serial.print("Receiving: ");
+	Serial.println(c, HEX);
 	
 	// Handle position only characters
 	if (c == CR)
@@ -479,8 +480,8 @@ void SwapPages()
 
 void ProcessSentByte(char c)
 {
-	//Serial.print("Sending: ");
-	//Serial.println(c, HEX);
+	Serial.print("Sending: ");
+	Serial.println(c, HEX);
 	
 	// Handle Commands
 	if (c >= 0x10 && c <= 0x17)
