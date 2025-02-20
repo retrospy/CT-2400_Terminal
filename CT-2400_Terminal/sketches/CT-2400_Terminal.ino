@@ -1,8 +1,3 @@
-
-#include "hardware/gpio.h"
-#include "hardware/clocks.h"
-#include "hardware/pwm.h"
-
 #define LF			0x0A
 #define CR			0x0D
 
@@ -85,31 +80,11 @@ int GetBaudRate()
 
 void SetupClock(int baudRate)
 { 
-	const uint32_t f_pwm = baudRate * 16;	// frequency we want to generate
-	const uint16_t duty = 50;				// duty cycle, in percent
+	pinMode(CLK_OUT, OUTPUT);
+	analogWriteFreq(baudRate * 16);
+	analogWriteResolution(8);
 	
-	gpio_set_function(CLK_OUT, GPIO_FUNC_PWM); // Tell CLK_OUT it is allocated to the PWM
-	uint slice_num = pwm_gpio_to_slice_num(0); // get PWM slice for CLK_OUT (it's slice 0)
-	
-	// set frequency
-	// determine top given Hz - assumes free-running counter rather than phase-correct
-	uint32_t f_sys = clock_get_hz(clk_sys); // typically 125'000'000 Hz
-	float divider = f_sys / 1'000'000UL; // let's arbitrarily choose to run pwm clock at 1MHz
-	pwm_set_clkdiv(slice_num, divider); // pwm clock should now be running at 1MHz
-	uint32_t top =  1'000'000UL / f_pwm - 1; // TOP is u16 has a max of 65535, being 65536 cycles
-	pwm_set_wrap(slice_num, top);
-	
-	// set duty cycle
-	uint16_t level = (top + 1) * duty / 100 - 1; // calculate channel level from given duty cycle in %
-	pwm_set_chan_level(slice_num, 0, level); 
-	
-	pwm_set_enabled(slice_num, true); // let's go!
-	
-	//pinMode(CLK_OUT, OUTPUT);
-	//analogWriteFreq(baudRate * 16);
-	//analogWriteResolution(8);
-	
-	//analogWrite(CLK_OUT, 128);
+	analogWrite(CLK_OUT, 128);
 	
 	clock_configure_gpin(clk_peri, CLK_IN, baudRate * 16, baudRate * 16);
 }
@@ -402,8 +377,8 @@ static bool eatNextLifeFeed = false;
  
 void ProcessReceivedByte(char c)
 {
-	Serial.print("Receiving: ");
-	Serial.println(c, HEX);
+	//Serial.print("Receiving: ");
+	//Serial.println(c, HEX);
 	
 	// Handle position only characters
 	if (c == CR)
@@ -505,8 +480,8 @@ void SwapPages()
 
 void ProcessSentByte(char c)
 {
-	Serial.print("Sending: ");
-	Serial.println(c, HEX);
+	//Serial.print("Sending: ");
+	//Serial.println(c, HEX);
 	
 	// Handle Commands
 	if (c >= 0x10 && c <= 0x17)
