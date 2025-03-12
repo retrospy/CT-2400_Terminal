@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{803FD0C6-D64E-4E16-9DC3-1DAEC859A3D2}") = "DummyHost", "DummyHost\DummyHost.vgdbproj", "{795054EB-E5E2-4ACF-BCE2-1B19403359A4}"
-EndProject
 Project("{803FD0C6-D64E-4E16-9DC3-1DAEC859A3D2}") = "CT-2400_Terminal", "CT-2400_Terminal\CT-2400_Terminal.vgdbproj", "{4E812128-C11F-4B6B-840D-91D37F85DB58}"
 EndProject
 Global
@@ -13,10 +11,6 @@ Global
 		Release|Raspberry_Pi_Pico = Release|Raspberry_Pi_Pico
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{795054EB-E5E2-4ACF-BCE2-1B19403359A4}.Debug|Raspberry_Pi_Pico.ActiveCfg = Debug|Raspberry_Pi_Pico
-		{795054EB-E5E2-4ACF-BCE2-1B19403359A4}.Debug|Raspberry_Pi_Pico.Build.0 = Debug|Raspberry_Pi_Pico
-		{795054EB-E5E2-4ACF-BCE2-1B19403359A4}.Release|Raspberry_Pi_Pico.ActiveCfg = Release|Raspberry_Pi_Pico
-		{795054EB-E5E2-4ACF-BCE2-1B19403359A4}.Release|Raspberry_Pi_Pico.Build.0 = Release|Raspberry_Pi_Pico
 		{4E812128-C11F-4B6B-840D-91D37F85DB58}.Debug|Raspberry_Pi_Pico.ActiveCfg = Debug|Raspberry_Pi_Pico
 		{4E812128-C11F-4B6B-840D-91D37F85DB58}.Debug|Raspberry_Pi_Pico.Build.0 = Debug|Raspberry_Pi_Pico
 		{4E812128-C11F-4B6B-840D-91D37F85DB58}.Release|Raspberry_Pi_Pico.ActiveCfg = Release|Raspberry_Pi_Pico

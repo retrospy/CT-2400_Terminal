@@ -1,47 +1,24 @@
-#define LF			0x0A
-#define CR			0x0D
 
-#define BAUD110     2
-#define BAUD150     3
-#define BAUD300     4
-#define BAUD600     5
-#define BAUD1200    6
-#define BAUD2400	11
-#define BAUD4800	12
-#define BAUD9600	13
+#include "common.h"
+#include "CT-1024.h"
+#include "Cromemco3102.h"
 
-#define SCROLL		7
+#include "hardware/flash.h" // for the flash erasing and writing
+#include "hardware/sync.h" // for the interrupts
 
-#define LOCAL_ECHO  8
 
-#define LOWER_CASE  9
+Terminal* terminal = nullptr;
 
-#define AC30_CMD	10
-
-#define PAGE        27
-
-#define REC_OFF     16
-#define REC_ON      17
-#define RDR_OFF     18
-#define RDR_ON      19
-
-#define CLK_IN      20
-#define CLK_OUT     21
-
-#define RESET		28
-
-// TeraTerm Default 80x24
-// CT-1024 32x16
-// CT-64 64x16
-// CT-82 82x16
-#define COLUMNS 80
-#define ROWS	24
-#define PAGES	 2
-
-bool wrapVertical = false;
+volatile bool wrapVertical = false;
 bool wrapHorizontal = true;
-bool useAC30Commands = false;
-bool hasLowercase = true;
+
+volatile bool hasLowercase = true;
+
+volatile bool resetPushed = false;
+
+volatile bool setupComplete = false;
+
+volatile bool offlineMode = false;
 
 int baudRate = 300;
 
@@ -51,9 +28,21 @@ struct Position
 	int h;
 };
 
+struct FlashConfig
+{
+	FlashConfig()
+	{
+		
+	}
+	int magic_number;
+	int version;
+	int TerminalType;
+};
+
 // Buffer goes from 1 to ROWS/COLUMNS, so column and row 0 are ignored 
 char pageBuffer[PAGES][ROWS + 1][COLUMNS + 1];  
-int currentPageBuffer = 0;
+volatile int currentPageBuffer = 0;
+volatile int newPageBuffer = 0;
 Position currentPageBufferPosition[PAGES];
 int firstRowOfPageBuffer[PAGES];
 
@@ -88,8 +77,6 @@ void SetupClock(int baudRate)
 	
 	clock_configure_gpin(clk_peri, CLK_IN, baudRate * 16, baudRate * 16);
 }
-
-
 
 void GetCurrentScreenPosition(int& v, int& h)
 {
@@ -132,12 +119,16 @@ void MoveCursorToHome()
 
 void EraseToEOL()
 {
+#ifndef DEBUG
 	Serial.printf("%c[K", 27);
+#endif
 }
 
 void EraseToEOF()
 {
+#ifndef DEBUG
 	Serial.printf("%c[J", 27);
+#endif
 }
 
 int GenerateRealRowPosition(int terminalRow)
@@ -156,13 +147,7 @@ void WriteCharactorToCurrentPageBuffer(char c)
 		                         [currentPageBufferPosition[currentPageBuffer].h] = hasLowercase ? c : toupper(c);
 }
 
-void sendPulse(int pin)
-{
-	//Serial.println(clock_get_hz(clk_peri));
-	digitalWrite(pin, LOW);
-	delayMicroseconds(1);
-	digitalWrite(pin, HIGH);
-}
+
 
 bool CommandCursorRight()
 {
@@ -270,6 +255,7 @@ bool CommandHome()
 
 bool CommandEraseToEOL()
 {
+#ifndef DEBUG
 	Serial.printf("%c[K", 27);
 	
 	int v, h;
@@ -277,12 +263,14 @@ bool CommandEraseToEOL()
 	
 	for (int i = h; i <= COLUMNS; ++i)
 		pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = ' ';
+#endif
 	
 	return true;
 }
 
 bool CommandEraseToEOF()
 {
+#ifndef DEBUG
 	Serial.printf("%c[J", 27);
 	
 	int v, h;
@@ -302,86 +290,206 @@ bool CommandEraseToEOF()
 		{
 			pageBuffer[currentPageBuffer][j][k] = ' ';
 		}
+#endif
 	
 	return true;
 }
 
-bool CommandReaderOn()
+bool CommandEraseAll()
 {
-	sendPulse(RDR_ON);
+
+#ifndef DEBUG
+	Serial.printf("%c[2J", 27);
+	
+	for (int j = 1; j <= ROWS; ++j)
+		for (int k = 1; k <= COLUMNS; ++k)
+		{
+			pageBuffer[currentPageBuffer][j][k] = ' ';
+		}
+#endif
 	
 	return true;
 }
 
-bool CommandRecordOn()
+bool CommandEraseLine()
 {
-	sendPulse(REC_ON);
+#ifndef DEBUG
+	Serial.printf("%c[2K", 27);
+	
+	int v, h;
+	GetCurrentScreenPosition(v, h);
+	
+	for (int i = 0; i <= COLUMNS; ++i)
+		pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = ' ';
+#endif
 	
 	return true;
 }
 
-bool CommandReaderOff()
+bool CommandCursorOn()
 {
-	sendPulse(RDR_OFF);
+	Serial.printf("%c[?25h", 27);
 	
 	return true;
 }
 
-bool CommandRecordOff()
+bool CommandCursorOff()
 {
-	sendPulse(REC_OFF);
+	Serial.printf("%c[?25l", 27);
 	
 	return true;
 }
 
-static bool(*CommandAssigment[2][8])();
+bool cursorOn = true;
 
-void AssignCommands()
+bool CommandCursorToggle()
 {
-	// Default Command Set
-	CommandAssigment[0][0] = CommandCursorRight; // ^P
-	CommandAssigment[0][1] = CommandCursorDown; // ^Q
-	CommandAssigment[0][2] = CommandCursorLeft; // ^R
-	CommandAssigment[0][3] = CommandHome; // ^S
-	CommandAssigment[0][4] = CommandEraseToEOL; // ^T
-	CommandAssigment[0][5] = CommandCursorUp; // ^U
-	CommandAssigment[0][6] = CommandEraseToEOF; // ^V
-	CommandAssigment[0][7] = nullptr; // ^W
-
-	// AC-30 Command Set
-	CommandAssigment[1][0] = CommandHome; // ^P
-	CommandAssigment[1][1] = CommandReaderOn; // ^Q
-	CommandAssigment[1][2] = CommandRecordOn; // ^R
-	CommandAssigment[1][3] = CommandReaderOff; // ^S
-	CommandAssigment[1][4] = CommandRecordOff; // ^T
-	CommandAssigment[1][5] = CommandEraseToEOL; // ^U
-	CommandAssigment[1][6] = CommandEraseToEOF; // ^V
-	CommandAssigment[1][7] = CommandCursorRight; // ^W	
-}
-
-void ProcessCommand(char c, bool receive)
-{
-	if (receive)
-	{
-		if (CommandAssigment[1][c - 0x10] != nullptr)
-			CommandAssigment[1][c - 0x10]();
-	}
+	if (cursorOn)
+		CommandCursorOff();
 	else
-	{
-		if (CommandAssigment[useAC30Commands == false ? 0 : 1][c - 0x10] != nullptr)
-			CommandAssigment[useAC30Commands == false ? 0 : 1][c - 0x10]();		
-	}
+		CommandCursorOn();
+	
+	cursorOn = !cursorOn;
+	
+	return true;
 }
 
-static bool eatNextLifeFeed = false;
- 
+bool CommandStartBlink()
+{
+	Serial.printf("%c[5m", 27);
+	
+	return true;
+}
+
+bool CommandNormalVideo()
+{
+	Serial.printf("%c[m", 27);
+	
+	return true;
+}
+
+bool CommandDeleteLine()
+{
+	
+	int v;
+	int h;
+	GetCurrentScreenPosition(v, h);
+	
+	int deletedRow = GenerateRealRowPosition(v);
+
+	MoveCursor(v, 1);
+	EraseToEOF();
+	
+	for (int j = v + 1; j <= ROWS; ++j)
+		for (int k = 1; k <= COLUMNS; ++k)
+		{
+			pageBuffer[currentPageBuffer][GenerateRealRowPosition(j - 1)][k] = 
+						pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k];
+			Serial.print(pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k]);
+		}
+
+	for (int k = 1; k <= COLUMNS; ++k)
+	{
+		pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k] = ' ';
+		Serial.print(pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k]);
+	}
+		
+	MoveCursor(v, h);
+	
+	return true;
+}
+
+bool CommandInsertLine()
+{
+	int v;
+	int h;
+	GetCurrentScreenPosition(v, h);
+	
+	for (int j = ROWS - 1; j >= v; --j)
+	{
+		for (int k = 1; k <= COLUMNS; ++k)
+		{
+			pageBuffer[currentPageBuffer][GenerateRealRowPosition(j + 1)][k] = 
+						pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k];
+		}
+	}
+
+	for (int k = 1; k <= COLUMNS; ++k)
+	{
+		pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][k] = ' ';
+	}
+	
+	MoveCursor(v, 1);
+	EraseToEOF();
+	for (int i = v; i <= ROWS; ++i)
+	{
+		for (int j = 1; j <= COLUMNS; ++j)
+		{
+			Serial.print(pageBuffer[currentPageBuffer][GenerateRealRowPosition(i)][j]);
+		}
+	}
+	
+	MoveCursor(v, h);
+	
+	return true;
+}
+
+int g_keysToConsume = 0;
+std::vector<char> g_consumedKeys;
+bool(*g_keysConsumedCallback)(bool receive) = nullptr;
+
+bool ProcessVT100EscapeCode(bool receive)
+{
+	switch (g_consumedKeys[0])
+	{
+	case 'A':
+		CommandCursorUp();
+		break;
+	case 'B':
+		CommandCursorDown();
+		break;
+	case 'C':
+		CommandCursorRight();
+		break;
+	case 'D':
+		CommandCursorLeft();
+		break;
+	}
+	
+	return true;
+}
+
+bool CommandVT100EscapeCode()
+{
+	g_keysToConsume = 1;
+	g_keysConsumedCallback = ProcessVT100EscapeCode;
+	
+	return false;
+}
+
 void ProcessReceivedByte(char c)
 {
-	//Serial.print("Receiving: ");
-	//Serial.println(c, HEX);
+#ifdef DEBUG
+	Serial.print("Process Received Byte: ");
+	Serial.println(c, HEX);
+#endif
 	
 	// Handle position only characters
-	if (c == CR)
+	if (g_keysToConsume > 0)
+	{
+		g_consumedKeys.push_back(c);
+		g_keysToConsume--;
+		if (g_keysToConsume == 0)
+			g_keysConsumedCallback(true);
+		g_consumedKeys.clear();
+		return;
+	}
+	else if (terminal->IsCommand(c, true))
+	{
+		terminal->ProcessCommand(c, true);
+		return;
+	}
+	else if (c == CR)
 	{
 		Serial.write(CR);
 		currentPageBufferPosition[currentPageBuffer].h = 1;
@@ -392,6 +500,7 @@ void ProcessReceivedByte(char c)
 		if (currentPageBufferPosition[currentPageBuffer].v != ROWS)
 		{
 			Serial.write(LF);
+			
 			currentPageBufferPosition[currentPageBuffer].v += 1;
 		}
 		else if (wrapVertical && currentPageBufferPosition[currentPageBuffer].v == ROWS)
@@ -406,14 +515,15 @@ void ProcessReceivedByte(char c)
 		{
 			Serial.write(LF);
 				
-			firstRowOfPageBuffer[currentPageBuffer] = (((firstRowOfPageBuffer[currentPageBuffer] - 1) + 1) % ROWS) + 1;
+			firstRowOfPageBuffer[currentPageBuffer] = (((firstRowOfPageBuffer[currentPageBuffer] - 1) + 1) % ROWS) + 1;				
 		}
+		
+		CommandEraseLine();
+		
 		return;
 	}
 		
-	if (c >= 0x10 && c <= 0x17)
-		ProcessCommand(c, true);
-	else if (c >= 0x20 && c <= 0x7f)
+	if (c >= 0x20 && c <= 0x7f)
 	{
 		int v, h;
 		GetCurrentScreenPosition(v, h);
@@ -478,79 +588,29 @@ void SwapPages()
 	MoveCursor(currentPageBufferPosition[currentPageBuffer].v, currentPageBufferPosition[currentPageBuffer].h);
 }
 
-void ProcessSentByte(char c)
-{
-	//Serial.print("Sending: ");
-	//Serial.println(c, HEX);
-	
-	// Handle Commands
-	if (c >= 0x10 && c <= 0x17)
-	{
-		ProcessCommand(c, false);
-	}
-	else
-	{
-		Serial1.write(hasLowercase ? c : toupper(c));
-	}
+char startupMessage[3][COLUMNS];
+std::deque<char> inputBuffer;
 
-	if (digitalRead(LOCAL_ECHO) == HIGH)
-	{
-		ProcessReceivedByte(c);	
-	}
+void initScreen()
+{
+	CommandCursorOn();
+	MoveCursorToHome();
+	EraseToEOF();
+	
+	for (int j = 1; j <= ROWS; ++j)
+		for (int k = 1; k <= COLUMNS; ++k)
+		{
+			Serial.print(pageBuffer[currentPageBuffer][j][k]);
+		}
+	
+	MoveCursor(9, 1);
+	currentPageBufferPosition[currentPageBuffer] = { 9, 1 };
 }
 
-char startupMessage[3][COLUMNS];
-
-void setup() {
-
-	AssignCommands();
-	
-	pinMode(BAUD110, INPUT_PULLUP);
-	pinMode(BAUD150, INPUT_PULLUP);
-	pinMode(BAUD300, INPUT_PULLUP);
-	pinMode(BAUD600, INPUT_PULLUP);
-	pinMode(BAUD1200, INPUT_PULLUP);
-	pinMode(BAUD2400, INPUT_PULLUP);
-	pinMode(BAUD4800, INPUT_PULLUP);
-	pinMode(BAUD9600, INPUT_PULLUP);
-	
-	pinMode(SCROLL, INPUT_PULLUP);
-	
-	pinMode(LOCAL_ECHO, INPUT_PULLUP);
-	
-	pinMode(LOWER_CASE, INPUT_PULLUP);
-	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
-	
-	pinMode(AC30_CMD, INPUT_PULLUP);
-	
-	pinMode(PAGE, INPUT_PULLUP);
-	currentPageBuffer = digitalRead(PAGE) == HIGH ? 0 : 1;
-
-	pinMode(REC_OFF, OUTPUT);
-	digitalWrite(REC_OFF, HIGH);
-	
-	pinMode(REC_ON, OUTPUT);
-	digitalWrite(REC_ON, HIGH);
-	
-	pinMode(RDR_OFF, OUTPUT);
-	digitalWrite(RDR_OFF, HIGH);
-	
-	pinMode(RDR_ON, OUTPUT);
-	digitalWrite(RDR_ON, HIGH);
-	
-	pinMode(RESET, INPUT_PULLUP);
-	
-	int baudRate = GetBaudRate();
-	
-	SetupClock(baudRate);
-	
+void initPageBuffer()
+{
 	firstRowOfPageBuffer[0] = 1;
 	firstRowOfPageBuffer[1] = 1;
-	
-	                         // 12345678901234567890123456789012345678901234567890123456789012345678901234567890
-	strncpy(startupMessage[0], "                    ******  RetroSpy Technologies  ******                       ", 80);
-	strncpy(startupMessage[1], "                                   CT-2400                                      ", 80);
-	strncpy(startupMessage[2], "                               Terminal System                                  ", 80);
 	
 	for (int i = 0; i < PAGES; ++i)
 		for (int j = 1; j <= ROWS; ++j)
@@ -559,11 +619,13 @@ void setup() {
 				if (i == currentPageBuffer)
 				{
 					if (j == 1)
-						pageBuffer[i][j][k] = hasLowercase ? startupMessage[0][k-1] : toupper(startupMessage[0][k-1]);		
+						pageBuffer[i][j][k] = hasLowercase ? startupMessage[0][k - 1] : toupper(startupMessage[0][k - 1]);		
 					else if (j == 3)
-						pageBuffer[i][j][k] = hasLowercase ? startupMessage[1][k-1] : toupper(startupMessage[1][k-1]);	
+						pageBuffer[i][j][k] = hasLowercase ? startupMessage[1][k - 1] : toupper(startupMessage[1][k - 1]);	
 					else if (j == 5)
-						pageBuffer[i][j][k] = hasLowercase ? startupMessage[2][k-1] : toupper(startupMessage[2][k-1]);
+						pageBuffer[i][j][k] = hasLowercase ? startupMessage[2][k - 1] : toupper(startupMessage[2][k - 1]);
+					else if (j == 7)
+						pageBuffer[i][j][k] = hasLowercase ? terminal->StartupMessage()[k - 1] : toupper(terminal->StartupMessage()[k - 1]);
 					else
 					{
 						pageBuffer[i][j][k] = ' ';					
@@ -577,42 +639,249 @@ void setup() {
 	
 	currentPageBufferPosition[0] = { 1, 1 };
 	currentPageBufferPosition[1] = { 1, 1 };
+}
+
+void reinit()
+{
+	inputBuffer.clear();
 	
+	terminal->AssignCommands();
+	
+	int baudRate = GetBaudRate();
+	Serial1.end();
+	
+	SetupClock(baudRate);
 	Serial1.begin(baudRate);
+	
+	initPageBuffer();
+	
+	while (!Serial) ;
+	
+	initScreen();
+}
+
+static FlashConfig config;
+
+static void SaveConfigToFlash()
+{	
+	uint32_t interrupts = save_and_disable_interrupts();
+	multicore_lockout_start_blocking();
+	flash_range_erase((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), FLASH_SECTOR_SIZE);
+	flash_range_program((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), (uint8_t*)&config, FLASH_PAGE_SIZE);
+	multicore_lockout_end_blocking();
+	restore_interrupts(interrupts);
+}
+
+static int LoadTerminalType()
+{
+	const uint8_t* flash_target_contents = (const uint8_t *)(XIP_BASE + (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE));
+	memcpy(&config, flash_target_contents, sizeof(config));
+	
+	if (config.magic_number != 1337 || config.version != 0 || config.TerminalType < 0 || config.TerminalType > 1)
+	{
+		config.magic_number = 1337;
+		config.version = 0;
+		config.TerminalType = 0;
+	}
+	
+	return config.TerminalType;
+}
+
+static void SetTerminalType(int terminalType, bool callingFromSetup)
+{
+	config.TerminalType = terminalType;
+	
+	if (!callingFromSetup)
+		SaveConfigToFlash();
+	
+	delete terminal;
+	terminal = nullptr;
+		
+	switch (config.TerminalType)
+	{
+	case 1:
+		terminal = new Cromemco3102();
+		break;
+	default:
+		terminal = new CT_1024();
+		break;
+	}
+	
+	if (!callingFromSetup)
+		reinit();
+
+}
+
+static void ToggleTerminalType()
+{
+	config.TerminalType = (config.TerminalType + 1) % 2;
+	SetTerminalType(config.TerminalType, false);
+}
+
+void ProcessSentByte(char c)
+{
+#ifdef DEBUG
+	Serial.print("Process Sent Byte: ");
+	Serial.println(c, HEX);
+#endif
+	
+	// Handle position only characters
+	if (c == 0x06) // ^F
+	{
+		ToggleTerminalType();
+		return;
+	}
+	if (g_keysToConsume > 0)
+	{
+		g_consumedKeys.push_back(c);
+		g_keysToConsume--;
+		if (g_keysToConsume == 0)
+		{
+			bool passCharToHost = g_keysConsumedCallback(false);
+			if (passCharToHost)
+				for (auto& it : g_consumedKeys)
+				{
+#ifdef DEBUG
+					Serial.print("Sending: ");
+					Serial.println(c, HEX);
+#endif
+					Serial1.write(hasLowercase ? c : toupper(c));
+				}
+			g_consumedKeys.clear();
+		}
+		return;
+	}
+	else if (terminal->IsCommand(c, false))
+	{
+		bool passCharToHost = terminal->ProcessCommand(c, false);
+		
+		if (passCharToHost)
+		{
+#ifdef DEBUG
+			Serial.print("Sending: ");
+			Serial.println(c, HEX);
+#endif
+			Serial1.write(hasLowercase ? c : toupper(c));
+		}
+		
+		return;
+	}
+#ifdef DEBUG
+	Serial.print("Sending: ");
+	Serial.println(c, HEX);
+#endif
+	Serial1.write(hasLowercase ? c : toupper(c));
+
+	if (offlineMode)
+	{
+		ProcessReceivedByte(c);	
+	}
+}
+
+bool IsLocalEchoOn()
+{
+	return offlineMode;
+}
+
+void setup() 
+{
 	Serial.begin(115200);
 	
 	while (!Serial) ;
 	
-	MoveCursorToHome();
-	EraseToEOF();
+	SetTerminalType(LoadTerminalType(), true);
 	
-	for (int j = 1; j <= ROWS; ++j)
-		for (int k = 1; k <= COLUMNS; ++k)
-		{
-			Serial.print(pageBuffer[currentPageBuffer][j][k]);
-		}
+	terminal->AssignCommands();
 	
-	MoveCursor(7, 1);
-	currentPageBufferPosition[currentPageBuffer] = { 7, 1 };
+	pinMode(BAUD110, INPUT_PULLUP);
+	pinMode(BAUD150, INPUT_PULLUP);
+	pinMode(BAUD300, INPUT_PULLUP);
+	pinMode(BAUD600, INPUT_PULLUP);
+	pinMode(BAUD1200, INPUT_PULLUP);
+	pinMode(BAUD2400, INPUT_PULLUP);
+	pinMode(BAUD4800, INPUT_PULLUP);
+	pinMode(BAUD9600, INPUT_PULLUP);
+	
+	pinMode(SCROLL, INPUT_PULLUP);
+	wrapVertical = digitalRead(SCROLL) == LOW;
+
+	pinMode(LOCAL_ECHO, INPUT_PULLUP);
+	offlineMode = digitalRead(LOCAL_ECHO) == HIGH;
+
+	pinMode(LOWER_CASE, INPUT_PULLUP);
+	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
+
+	pinMode(PAGE, INPUT_PULLUP);
+	currentPageBuffer = digitalRead(PAGE) == HIGH ? 0 : 1;
+	newPageBuffer = currentPageBuffer;
+	
+	pinMode(RESET, INPUT_PULLUP);
+	resetPushed = false;
+	
+	terminal->TerminalSetup();
+	                         // 12345678901234567890123456789012345678901234567890123456789012345678901234567890
+	strncpy(startupMessage[0], "                    ******  RetroSpy Technologies  ******                       ", 80);
+	strncpy(startupMessage[1], "                                   CT-2400                                      ", 80);
+	strncpy(startupMessage[2], "                               Terminal System                                  ", 80);
+	
+	initPageBuffer();
+	
+	int baudRate = GetBaudRate();
+	SetupClock(baudRate);
+	
+	Serial1.begin(baudRate);
+	
+	setupComplete = true;
+	
+	initScreen();
+
 }
+
+//void setup1()
+//{
+//	while (!Serial || !setupComplete) ;
+//	//multicore_lockout_victim_init();  // This locks up the core when executed.  BUG?
+//}
+
+//void loop1()
+//{
+//	while (!Serial || !setupComplete) ;
+//
+//	resetPushed = digitalRead(RESET) == LOW;
+//	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
+//	wrapVertical = digitalRead(SCROLL) == LOW;
+//	newPageBuffer = digitalRead(PAGE) == HIGH ? 0 : 1;
+//	offlineMode = digitalRead(LOCAL_ECHO) == HIGH;
+//	
+//	terminal->TerminalLoop1();
+//}
 
 void loop() 
 {
-	if (digitalRead(RESET) == LOW)
+	int pins = gpio_get_all();
+	resetPushed = (pins & (1 << RESET)) == 0;
+	hasLowercase = (pins & (1 << LOWER_CASE)) != 0;
+	wrapVertical = (pins & (1 << SCROLL)) == 0;
+	newPageBuffer = (pins & (1 << PAGE)) != 0 ? 0 : 1;
+	offlineMode = (pins & (1 << LOCAL_ECHO)) != 0;
+	
+	terminal->TerminalLoop1(pins);
+	
+	if (resetPushed)
 	{
-		MoveCursorToHome();
-		EraseToEOF();
-		*((volatile uint32_t*)(PPB_BASE + 0x0ED0C)) = 0x5FA0004;
+		reinit();
 	}
 	
-	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
-	useAC30Commands = digitalRead(AC30_CMD) == HIGH;
-	wrapVertical = digitalRead(SCROLL) == LOW;
-	
-	int currentPage = digitalRead(PAGE) == HIGH ? 0 : 1;
-	if (currentPage != currentPageBuffer)
+	if (newPageBuffer != currentPageBuffer)
 	{
 		SwapPages();
+	}
+
+	if (Serial1.available())
+	{
+		char temp_buffer[1024];
+		int count = Serial1.readBytes(temp_buffer, min(1024, Serial1.available()));
+		inputBuffer.insert(inputBuffer.cend(), temp_buffer, temp_buffer + count);
 	}
 	
 	char c;
@@ -622,9 +891,10 @@ void loop()
 		ProcessSentByte(c);
 	}
 	
-	if (Serial1.available())
+	if (!inputBuffer.empty())
 	{
-		c = Serial1.read();
+		c = inputBuffer.front();
+		inputBuffer.pop_front();
 		ProcessReceivedByte(c);
 	}
 }

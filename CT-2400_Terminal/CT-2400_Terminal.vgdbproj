@@ -18,7 +18,12 @@
           <string>CT-2400_Terminal.ino</string>
         </Files>
       </RootSketchFolder>
-      <OtherFiles />
+      <OtherFiles>
+        <string>sketches\common.h</string>
+        <string>sketches\CT-1024.h</string>
+        <string>sketches\Terminal.h</string>
+        <string>sketches\Cromemco3102.h</string>
+      </OtherFiles>
     </ProjectModeSettings>
   </Project>
   <Build xsi:type="com.visualgdb.build.external.arduino">
@@ -145,7 +150,7 @@
           <Entries>
             <KeyValue>
               <Key>flash</Key>
-              <Value>2097152_0</Value>
+              <Value>2097152_262144</Value>
             </KeyValue>
             <KeyValue>
               <Key>freq</Key>
