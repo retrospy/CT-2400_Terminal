@@ -2,7 +2,7 @@
 
 #include "Terminal.h"
 
-#define NUM_3102_COMMANDS 0x6F
+#define NUM_3102_COMMANDS 0x70
 
 struct Command
 {

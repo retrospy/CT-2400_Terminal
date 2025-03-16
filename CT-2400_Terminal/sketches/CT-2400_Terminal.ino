@@ -480,8 +480,10 @@ void ProcessReceivedByte(char c)
 		g_consumedKeys.push_back(c);
 		g_keysToConsume--;
 		if (g_keysToConsume == 0)
+		{
 			g_keysConsumedCallback(true);
-		g_consumedKeys.clear();
+			g_consumedKeys.clear();
+		}
 		return;
 	}
 	else if (terminal->IsCommand(c, true))
@@ -886,9 +888,41 @@ void loop()
 	
 	char c;
 	if (Serial.available()) 
-	{      
-		c = Serial.read();
-		ProcessSentByte(c);
+	{   		
+		if (Serial.available() >= 3)
+		{
+			if (Serial.peek() == 0x1D)
+			{
+				c = Serial.read();
+				if (Serial.peek() == '[')
+				{
+					Serial.read();
+					switch (Serial.read())  // VT-100 Command to Follow
+					{
+					case 'A':
+					case 'B':
+					case 'C':
+					case 'D':
+						ProcessSentByte(c + ARROW_KEY_OFFSET);
+						break;
+					default:
+						if (Serial.available())
+						{
+							ProcessSentByte(Serial.read());
+						}
+						break;
+					}
+				}
+				else
+				{
+					ProcessSentByte(c);
+				}
+			}
+		}
+		else
+		{
+			ProcessSentByte(Serial.read());
+		}
 	}
 	
 	if (!inputBuffer.empty())
