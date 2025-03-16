@@ -898,7 +898,8 @@ void loop()
 				if (Serial.peek() == '[')
 				{
 					Serial.read();
-					switch (Serial.read())  // VT-100 Command to Follow
+					c = Serial.read();
+					switch (c)  // VT-100 Command to Follow
 					{
 					case 'A':
 					case 'B':
@@ -907,10 +908,9 @@ void loop()
 						ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
 						break;
 					default:
-						if (Serial.available())
-						{
-							ProcessSentByte(Serial.read());
-						}
+						ProcessSentByte(0x1B);
+						ProcessSentByte('[');
+						ProcessSentByte(c);
 						break;
 					}
 				}
