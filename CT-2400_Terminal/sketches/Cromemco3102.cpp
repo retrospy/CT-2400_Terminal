@@ -88,10 +88,10 @@ bool Cromemco3102::ProcessCommand(char c, bool receive)
 		case ARROW_DOWN:
 			Serial1.write(0x0A); // Down
 			break;
-		case ARROW_RIGHT:
+		case ARROW_LEFT:
 			Serial1.write(0x08); // Right
 			break;	
-		case ARROW_LEFT:
+		case ARROW_RIGHT:
 			Serial1.write(0x0C); // Left
 			break;	
 		}
