@@ -1,3 +1,4 @@
+#include "common.h"
 #include "Cromemco3102.h"
 
 #define		STX		0x02
@@ -77,34 +78,57 @@ static bool ProcessEscapeCode(bool isReceive)
 
 bool Cromemco3102::ProcessCommand(char c, bool receive)
 {
-	if (c == ESC)
-	{	
-		g_keysToConsume = 1;
-		g_keysConsumedCallback = ProcessEscapeCode;
-	}
-	else if (c == BS)
+	if (!receive)
 	{
-		int h, v;
+		switch (c)
+		{
+		case ARROW_UP:
+			Serial1.write(0x0B);  // Up
+			break;
+		case ARROW_DOWN:
+			Serial1.write(0x0A); // Down
+			break;
+		case ARROW_RIGHT:
+			Serial1.write(0x08); // Right
+			break;	
+		case ARROW_LEFT:
+			Serial1.write(0x0C); // Left
+			break;	
+		}
 		
-		GetCurrentScreenPosition(v, h);
-		MoveCursor(v, h - 1);
+		return false;
 	}
-	else if (c == ENQ)
+	else
 	{
-		Serial1.write(STX);
-		Serial1.write(STX);
-		Serial1.write('3');
-		Serial1.write('1');
-		Serial1.write('0');
-		Serial1.write('2');
+		if (c == ESC)
+		{	
+			g_keysToConsume = 1;
+			g_keysConsumedCallback = ProcessEscapeCode;
+		}
+		else if (c == BS)
+		{
+			int h, v;
+		
+			GetCurrentScreenPosition(v, h);
+			MoveCursor(v, h - 1);
+		}
+		else if (c == ENQ)
+		{
+			Serial1.write(STX);
+			Serial1.write(STX);
+			Serial1.write('3');
+			Serial1.write('1');
+			Serial1.write('0');
+			Serial1.write('2');
+		}
+		return true;
 	}
-	
-	return true;
 }
 
 bool Cromemco3102::IsCommand(char c, bool isReceive)
 {
-	return isReceive && (c == ESC || c == BS || c == ENQ || c == '\0');
+	return (isReceive && (c == ESC || c == BS || c == ENQ || c == '\0'))
+				|| (!isReceive && ((unsigned char)c) >= ARROW_UP && ((unsigned char)c) <= ARROW_LEFT);
 }
 
 void Cromemco3102::TerminalSetup()

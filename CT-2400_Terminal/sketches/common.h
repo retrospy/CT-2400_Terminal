@@ -38,6 +38,12 @@
 #define ROWS	24
 #define PAGES	 2
 
+#define ARROW_KEY_OFFSET	0xFA
+#define ARROW_UP			ARROW_KEY_OFFSET
+#define ARROW_DOWN			ARROW_KEY_OFFSET + 1
+#define ARROW_RIGHT			ARROW_KEY_OFFSET + 2
+#define ARROW_LEFT			ARROW_KEY_OFFSET + 3
+
 //#define DEBUG
 
 extern bool CommandCursorUp();
