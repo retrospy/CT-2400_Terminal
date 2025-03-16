@@ -75,7 +75,7 @@ void CT_1024::AssignCommands()
 	
 }
 
-bool CT_1024::ProcessCommand(char c, bool isReceive)
+bool CT_1024::ProcessCommand(char& c, bool isReceive)
 {
 	if (isReceive)
 	{

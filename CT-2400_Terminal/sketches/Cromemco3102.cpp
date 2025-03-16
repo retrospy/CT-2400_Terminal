@@ -85,27 +85,27 @@ static bool ProcessEscapeCode(bool isReceive)
 	return true;
 }
 
-bool Cromemco3102::ProcessCommand(char c, bool receive)
+bool Cromemco3102::ProcessCommand(char& c, bool receive)
 {
 	if (!receive)
 	{
 		switch (c)
 		{
 		case ARROW_UP:
-			Serial1.write(UP);  
+			c = UP;  
 			break;
 		case ARROW_DOWN:
-			Serial1.write(DOWN); 
+			c = DOWN; 
 			break;
 		case ARROW_LEFT:
-			Serial1.write(LEFT); 
+			c = LEFT; 
 			break;	
 		case ARROW_RIGHT:
-			Serial1.write(RIGHT);
+			c = RIGHT;
 			break;	
 		}
 		
-		return false;
+		return true;
 	}
 	else
 	{

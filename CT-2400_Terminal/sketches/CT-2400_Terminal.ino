@@ -904,7 +904,7 @@ void loop()
 					case 'B':
 					case 'C':
 					case 'D':
-						ProcessSentByte(c + ARROW_KEY_OFFSET);
+						ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
 						break;
 					default:
 						if (Serial.available())

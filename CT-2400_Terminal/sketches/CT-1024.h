@@ -9,7 +9,7 @@ class CT_1024 : public Terminal
 {
 public:
 	virtual void AssignCommands();
-	virtual bool ProcessCommand(char c, bool receive);
+	virtual bool ProcessCommand(char& c, bool receive);
 	virtual bool IsCommand(char c, bool isReceive);
 	virtual void TerminalSetup();
 	virtual void TerminalLoop1(int pins);
