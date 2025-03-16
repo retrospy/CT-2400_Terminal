@@ -667,10 +667,10 @@ static FlashConfig config;
 static void SaveConfigToFlash()
 {	
 	uint32_t interrupts = save_and_disable_interrupts();
-	multicore_lockout_start_blocking();
+	//multicore_lockout_start_blocking();
 	flash_range_erase((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), FLASH_SECTOR_SIZE);
 	flash_range_program((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), (uint8_t*)&config, FLASH_PAGE_SIZE);
-	multicore_lockout_end_blocking();
+	//multicore_lockout_end_blocking();
 	restore_interrupts(interrupts);
 }
 
