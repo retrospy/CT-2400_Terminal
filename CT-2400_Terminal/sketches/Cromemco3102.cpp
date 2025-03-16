@@ -36,6 +36,14 @@ bool static ProcessPositionCursor(bool receive)
 	return true;
 }
 
+bool static CommandErase()
+{
+	CommandEraseAll();
+	CommandHome();
+	
+	return true;
+}
+
 bool static CommandPositionCursor()
 {
 	g_keysToConsume = 2;
@@ -57,7 +65,7 @@ void Cromemco3102::AssignCommands()
 	CommandAssignment['B'] = CommandCursorDown;
 	CommandAssignment['C'] = CommandCursorRight;
 	CommandAssignment['D'] = CommandCursorLeft;
-	CommandAssignment['E'] = CommandEraseAll;
+	CommandAssignment['E'] = CommandErase;
 	CommandAssignment['F'] = CommandPositionCursor;
 	CommandAssignment['H'] = CommandHome;
 	CommandAssignment['J'] = CommandEraseToEOF;
