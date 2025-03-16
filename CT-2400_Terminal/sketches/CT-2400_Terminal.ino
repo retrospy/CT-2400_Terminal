@@ -892,7 +892,7 @@ void loop()
 	{   		
 		if (Serial.available() >= 3)
 		{
-			if (Serial.peek() == 0x1D)
+			if (Serial.peek() == 0x1B)
 			{
 				c = Serial.read();
 				if (Serial.peek() == '[')
@@ -918,6 +918,10 @@ void loop()
 				{
 					ProcessSentByte(c);
 				}
+			}
+			else
+			{
+				ProcessSentByte(Serial.read());
 			}
 		}
 		else
