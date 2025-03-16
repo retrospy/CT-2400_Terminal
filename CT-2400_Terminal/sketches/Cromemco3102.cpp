@@ -12,6 +12,13 @@ bool static ProcessPositionCursor(bool receive)
 {
 	int lineNumber = g_consumedKeys[0] - 0x1F;
 	int columnNumber = g_consumedKeys[1] - 0x1F;
+
+#ifdef DEBUG
+	Serial.print("M: ");
+	Serial.print(lineNumber);
+	Serial.print(" ");
+	Serial.println(columnNumber);
+#endif
 	
 	if (lineNumber <= ROWS && columnNumber <= COLUMNS)
 		MoveCursor(lineNumber, columnNumber);

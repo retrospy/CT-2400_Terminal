@@ -470,7 +470,7 @@ bool CommandVT100EscapeCode()
 void ProcessReceivedByte(char c)
 {
 #ifdef DEBUG
-	Serial.print("Process Received Byte: ");
+	Serial.print("R: ");
 	Serial.println(c, HEX);
 #endif
 	
@@ -480,8 +480,10 @@ void ProcessReceivedByte(char c)
 		g_consumedKeys.push_back(c);
 		g_keysToConsume--;
 		if (g_keysToConsume == 0)
+		{
 			g_keysConsumedCallback(true);
-		g_consumedKeys.clear();
+			g_consumedKeys.clear();
+		}
 		return;
 	}
 	else if (terminal->IsCommand(c, true))
@@ -721,7 +723,7 @@ static void ToggleTerminalType()
 void ProcessSentByte(char c)
 {
 #ifdef DEBUG
-	Serial.print("Process Sent Byte: ");
+	Serial.print("S: ");
 	Serial.println(c, HEX);
 #endif
 	
@@ -829,6 +831,7 @@ void setup()
 	int baudRate = GetBaudRate();
 	SetupClock(baudRate);
 	
+	Serial1.setFIFOSize(1024);
 	Serial1.begin(baudRate);
 	
 	setupComplete = true;
