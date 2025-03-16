@@ -6,6 +6,15 @@
 #define		BS		0x08
 #define		ESC		0x1B
 
+#define		CTRL_K	0x0B
+#define		CTRL_J	0x0A
+#define		CTRL_L	0x0C
+
+#define		UP		CTRL_K
+#define		DOWN	CTRL_J
+#define		LEFT	BS
+#define		RIGHT	CTRL_L
+
                                         // 12345678901234567890123456789012345678901234567890123456789012345678901234567890
 static char startupMessage[COLUMNS + 1] = "                    ******   Cromemco 3102 Mode   ******                        ";
 
@@ -83,16 +92,16 @@ bool Cromemco3102::ProcessCommand(char c, bool receive)
 		switch (c)
 		{
 		case ARROW_UP:
-			Serial1.write(0x0B);  // Up
+			Serial1.write(UP);  
 			break;
 		case ARROW_DOWN:
-			Serial1.write(0x0A); // Down
+			Serial1.write(DOWN); 
 			break;
 		case ARROW_LEFT:
-			Serial1.write(0x08); // Right
+			Serial1.write(LEFT); 
 			break;	
 		case ARROW_RIGHT:
-			Serial1.write(0x0C); // Left
+			Serial1.write(RIGHT);
 			break;	
 		}
 		
