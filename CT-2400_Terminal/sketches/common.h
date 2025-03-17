@@ -44,8 +44,6 @@
 #define ARROW_RIGHT			ARROW_KEY_OFFSET + 2
 #define ARROW_LEFT			ARROW_KEY_OFFSET + 3
 
-//#define DEBUG
-
 extern bool CommandCursorUp();
 extern bool CommandCursorDown();
 extern bool CommandCursorRight();
@@ -66,5 +64,7 @@ extern void TerminalSetup();
 extern void GetCurrentScreenPosition(int& v, int& h);
 
 extern int g_keysToConsume;
-extern std::vector<char> g_consumedKeys;
+extern std::vector<wchar_t> g_consumedKeys;
 extern bool(*g_keysConsumedCallback)(bool receive);
+
+extern bool isDebug;

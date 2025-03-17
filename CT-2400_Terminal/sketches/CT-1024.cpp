@@ -75,7 +75,7 @@ void CT_1024::AssignCommands()
 	
 }
 
-bool CT_1024::ProcessCommand(char& c, bool isReceive)
+bool CT_1024::ProcessCommand(wchar_t& c, bool isReceive)
 {
 	if (isReceive)
 	{
@@ -91,7 +91,7 @@ bool CT_1024::ProcessCommand(char& c, bool isReceive)
 	return false;
 }
 
-bool CT_1024::IsCommand(char c, bool isReceive)
+bool CT_1024::IsCommand(wchar_t c, bool isReceive)
 {
 	return c >= 0x10 && c <= 0x17;
 }
@@ -124,7 +124,12 @@ char* CT_1024::StartupMessage()
 	return startupMessage;
 }
 
-bool CT_1024::ShouldTransmit(char c)
+bool CT_1024::ShouldTransmit(wchar_t c)
 {
 	return true;
+}
+
+wchar_t CT_1024::TransformReceived(wchar_t c)
+{
+	return c;
 }
