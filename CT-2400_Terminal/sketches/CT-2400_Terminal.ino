@@ -6,6 +6,7 @@
 #include "hardware/flash.h" // for the flash erasing and writing
 #include "hardware/sync.h" // for the interrupts
 
+#define BUFFER_SIZE		1024
 
 Terminal* terminal = nullptr;
 
@@ -831,7 +832,7 @@ void setup()
 	int baudRate = GetBaudRate();
 	SetupClock(baudRate);
 	
-	Serial1.setFIFOSize(1024);
+	Serial1.setFIFOSize(BUFFER_SIZE);
 	Serial1.begin(baudRate);
 	
 	setupComplete = true;
@@ -859,6 +860,48 @@ void setup()
 //	terminal->TerminalLoop1();
 //}
 
+void HandleSend()
+{
+	if (Serial.available() >= 3)
+	{
+		if (Serial.peek() == 0x1B)
+		{
+			char c = Serial.read();
+			if (Serial.peek() == '[')
+			{
+				Serial.read();
+				c = Serial.read();
+				switch (c)  // VT-100 Command to Follow
+				{
+				case 'A':
+				case 'B':
+				case 'C':
+				case 'D':
+					ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
+					break;
+				default:
+					ProcessSentByte(0x1B);
+					ProcessSentByte('[');
+					ProcessSentByte(c);
+					break;
+				}
+			}
+			else
+			{
+				ProcessSentByte(c);
+			}
+		}
+		else
+		{
+			ProcessSentByte(Serial.read());
+		}
+	}
+	else
+	{
+		ProcessSentByte(Serial.read());
+	}
+}
+
 void loop() 
 {
 	int pins = gpio_get_all();
@@ -882,52 +925,15 @@ void loop()
 
 	if (Serial1.available())
 	{
-		char temp_buffer[1024];
-		int count = Serial1.readBytes(temp_buffer, min(1024, Serial1.available()));
+		char temp_buffer[BUFFER_SIZE];
+		int count = Serial1.readBytes(temp_buffer, min(BUFFER_SIZE, Serial1.available()));
 		inputBuffer.insert(inputBuffer.cend(), temp_buffer, temp_buffer + count);
 	}
 	
 	char c;
 	if (Serial.available()) 
 	{   		
-		if (Serial.available() >= 3)
-		{
-			if (Serial.peek() == 0x1B)
-			{
-				c = Serial.read();
-				if (Serial.peek() == '[')
-				{
-					Serial.read();
-					c = Serial.read();
-					switch (c)  // VT-100 Command to Follow
-					{
-					case 'A':
-					case 'B':
-					case 'C':
-					case 'D':
-						ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
-						break;
-					default:
-						ProcessSentByte(0x1B);
-						ProcessSentByte('[');
-						ProcessSentByte(c);
-						break;
-					}
-				}
-				else
-				{
-					ProcessSentByte(c);
-				}
-			}
-			else
-			{
-				ProcessSentByte(Serial.read());
-			}
-		}
-		else
-		{
-			ProcessSentByte(Serial.read());
-		}
+		HandleSend();
 	}
 	
 	if (!inputBuffer.empty())
