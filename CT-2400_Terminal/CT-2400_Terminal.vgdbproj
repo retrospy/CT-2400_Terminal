@@ -7,18 +7,23 @@
     </CustomSourceDirectories>
     <AutoProgramSPIFFSPartition>true</AutoProgramSPIFFSPartition>
     <ProjectModeSettings>
-      <ProjectGUID>795054eb-e5e2-4acf-bce2-1b19403359a4</ProjectGUID>
+      <ProjectGUID>4e812128-c11f-4b6b-840d-91d37f85db58</ProjectGUID>
       <GroupSourcesByTypes>true</GroupSourcesByTypes>
       <GroupSourcesByPaths>true</GroupSourcesByPaths>
       <SketchSubdirectory>sketches</SketchSubdirectory>
-      <MainSketchFile>DummyComputer.ino</MainSketchFile>
+      <MainSketchFile>CT-2400_Terminal_New.ino</MainSketchFile>
       <RootSketchFolder>
         <Subfolders />
         <Files>
-          <string>DummyHost.ino</string>
+          <string>CT-2400_Terminal.ino</string>
         </Files>
       </RootSketchFolder>
-      <OtherFiles />
+      <OtherFiles>
+        <string>sketches\common.h</string>
+        <string>sketches\CT-1024.h</string>
+        <string>sketches\Terminal.h</string>
+        <string>sketches\Cromemco3102.h</string>
+      </OtherFiles>
     </ProjectModeSettings>
   </Project>
   <Build xsi:type="com.visualgdb.build.external.arduino">
@@ -141,12 +146,11 @@
       </DebugSettingsOverride>
       <BuildSettingsExtension xsi:type="com.visualgdb.build.external.arduino.extension">
         <BoardID>rp2040:rp2040:rpipico</BoardID>
-        <COMPort />
         <Properties>
           <Entries>
             <KeyValue>
               <Key>flash</Key>
-              <Value>2097152_0</Value>
+              <Value>2097152_262144</Value>
             </KeyValue>
             <KeyValue>
               <Key>freq</Key>
