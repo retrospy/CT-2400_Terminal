@@ -12,6 +12,10 @@
 
 #define BUFFER_SIZE		2400
 
+// TODO: Multi-core doesn't current work because 
+// calling the "init victim" func locks up the core
+//#define MULTICORE
+
 Terminal* terminal = nullptr;
 
 volatile bool wrapVertical = false;
@@ -441,10 +445,7 @@ bool CommandCursorToggle()
 }
 
 bool CommandStartVideoAttribute(byte attributes, int v, int h)
-{
-	//if (attributes == pageBuffer[currentPageBuffer][v][h].VideoAttributes)
-	//	return true;
-	
+{	
 	pageBuffer[currentPageBuffer][v][h].VideoAttributes = attributes;
 	
 	if (attributes == VA_NORMAL)
@@ -632,7 +633,6 @@ void ProcessReceivedByte(wchar_t c)
 		Serial.println(c, HEX);
 	}
 	
-	// Handle position only characters
 	if (g_keysToConsume > 0)
 	{
 		g_consumedKeys.push_back(c);
@@ -678,7 +678,8 @@ void ProcessReceivedByte(wchar_t c)
 			firstRowOfPageBuffer[currentPageBuffer] = (((firstRowOfPageBuffer[currentPageBuffer] - 1) + 1) % ROWS) + 1;				
 		}
 		
-		//CommandEraseLine();
+		if (terminal->EraseLineOnLineFeed())
+			CommandEraseLine();
 		
 		return;
 	}
@@ -872,10 +873,14 @@ static FlashConfig config;
 static void SaveConfigToFlash()
 {	
 	uint32_t interrupts = save_and_disable_interrupts();
-	//multicore_lockout_start_blocking();
+#ifdef MULTICORE
+	multicore_lockout_start_blocking();
+#endif
 	flash_range_erase((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), FLASH_SECTOR_SIZE);
 	flash_range_program((PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE), (uint8_t*)&config, FLASH_PAGE_SIZE);
-	//multicore_lockout_end_blocking();
+#ifdef MULTICORE
+	multicore_lockout_end_blocking();
+#endif
 	restore_interrupts(interrupts);
 }
 
@@ -1056,24 +1061,27 @@ void setup()
 
 }
 
-//void setup1()
-//{
-//	while (!Serial || !setupComplete) ;
-//	//multicore_lockout_victim_init();  // This locks up the core when executed.  BUG?
-//}
+#ifdef MULTICORE
+void setup1()
+{
+	while (!Serial || !setupComplete) ;
+	multicore_lockout_victim_init();  // This locks up the core when executed.  BUG?
+}
 
-//void loop1()
-//{
-//	while (!Serial || !setupComplete) ;
-//
-//	resetPushed = digitalRead(RESET) == LOW;
-//	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
-//	wrapVertical = digitalRead(SCROLL) == LOW;
-//	newPageBuffer = digitalRead(PAGE) == HIGH ? 0 : 1;
-//	offlineMode = digitalRead(LOCAL_ECHO) == HIGH;
-//	
-//	terminal->TerminalLoop1();
-//}
+void loop1()
+{
+	while (!Serial || !setupComplete) ;
+
+	int pins = gpio_get_all();
+	resetPushed = (pins & (1 << RESET)) == 0;
+	hasLowercase = (pins & (1 << LOWER_CASE)) != 0;
+	wrapVertical = (pins & (1 << SCROLL)) == 0;
+	newPageBuffer = (pins & (1 << PAGE)) != 0 ? 0 : 1;
+	offlineMode = (pins & (1 << LOCAL_ECHO)) != 0;
+	
+	terminal->TerminalLoop1(pins);
+}
+#endif
 
 void HandleSend()
 {
@@ -1134,6 +1142,8 @@ void HandleSend()
 
 void loop() 
 {
+	
+#ifndef MULTICORE
 	int pins = gpio_get_all();
 	resetPushed = (pins & (1 << RESET)) == 0;
 	hasLowercase = (pins & (1 << LOWER_CASE)) != 0;
@@ -1142,6 +1152,7 @@ void loop()
 	offlineMode = (pins & (1 << LOCAL_ECHO)) != 0;
 	
 	terminal->TerminalLoop1(pins);
+#endif
 	
 	if (resetPushed)
 	{

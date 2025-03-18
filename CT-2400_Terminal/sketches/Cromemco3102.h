@@ -23,4 +23,5 @@ public:
 	virtual wchar_t* StartupMessage();
 	virtual bool ShouldTransmit(wchar_t c);
 	virtual int NextTabStop(int h);
+	virtual bool EraseLineOnLineFeed();
 };

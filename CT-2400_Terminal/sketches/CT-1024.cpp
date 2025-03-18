@@ -138,3 +138,8 @@ int CT_1024::NextTabStop(int h)
 {
 	return h;
 }
+
+bool CT_1024::EraseLineOnLineFeed()
+{
+	return true;
+}

@@ -17,6 +17,7 @@ public:
 	virtual wchar_t* StartupMessage();
 	virtual bool ShouldTransmit(wchar_t c);
 	virtual int NextTabStop(int h);
+	virtual bool EraseLineOnLineFeed();
 		
 private:
 	bool(*CommandAssignment[NUM_1024_COMMAND_SETS][NUM_1024_COMMANDS])();

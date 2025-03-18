@@ -472,3 +472,9 @@ int Cromemco3102::NextTabStop(int h)
 
 	return h;
 }
+
+
+bool Cromemco3102::EraseLineOnLineFeed()
+{
+	return false;
+}
