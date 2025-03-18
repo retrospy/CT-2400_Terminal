@@ -5,6 +5,7 @@
 //#define CROMEMCO3102
 //#define CT1024
 
+#define TAB			0x09
 #define LF			0x0A
 #define CR			0x0D
 
@@ -56,9 +57,13 @@ extern bool CommandInsertLine();
 extern bool CommandDeleteLine();
 extern bool CommandCursorToggle();
 extern bool CommandStartBlink();
+extern bool CommandStartReverse();
+extern bool CommandStartHalfIntensity();
+extern bool CommandStartUnderline();
+extern bool CommandStartInvisible();
 extern bool CommandNormalVideo();
+extern bool CommandMoveCursor(int v, int h);
 extern bool CommandVT100EscapeCode();
-extern void MoveCursor(int v, int h);
 extern bool IsLocalEchoOn();
 extern void TerminalSetup();
 extern void GetCurrentScreenPosition(int& v, int& h);

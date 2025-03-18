@@ -133,3 +133,8 @@ wchar_t CT_1024::TransformReceived(wchar_t c)
 {
 	return c;
 }
+
+int CT_1024::NextTabStop(int h)
+{
+	return h;
+}

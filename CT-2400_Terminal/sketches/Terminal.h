@@ -16,4 +16,6 @@ public:
 	virtual void TerminalLoop1(int pins) = 0;
 	virtual char* StartupMessage() = 0;
 	virtual bool ShouldTransmit(wchar_t c) = 0;
+	
+	virtual int NextTabStop(int h) = 0;
 };

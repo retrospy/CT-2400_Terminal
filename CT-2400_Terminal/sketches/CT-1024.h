@@ -16,6 +16,7 @@ public:
 	virtual void TerminalLoop1(int pins);
 	virtual char* StartupMessage();
 	virtual bool ShouldTransmit(wchar_t c);
+	virtual int NextTabStop(int h);
 		
 private:
 	bool(*CommandAssignment[NUM_1024_COMMAND_SETS][NUM_1024_COMMANDS])();

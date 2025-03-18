@@ -6,6 +6,7 @@
 #define		BS		0x08
 #define		ESC		0x1B
 
+
 #define		CTRL_K	0x0B
 #define		CTRL_J	0x0A
 #define		CTRL_L	0x0C
@@ -20,7 +21,7 @@ static char startupMessage[COLUMNS + 1] = "                    ******   Cromemco
 
 bool static ProcessPositionCursor(bool receive)
 {
-	int lineNumber = g_consumedKeys[0] - 0x1F;
+	int lineNumber = min(ROWS, g_consumedKeys[0] - 0x1F);
 	int columnNumber = g_consumedKeys[1] - 0x1F;
 
 	if (isDebug)
@@ -32,7 +33,7 @@ bool static ProcessPositionCursor(bool receive)
 	}
 	
 	if (lineNumber <= ROWS && columnNumber <= COLUMNS)
-		MoveCursor(lineNumber, columnNumber);
+		CommandMoveCursor(lineNumber, columnNumber);
 	
 	return true;
 }
@@ -69,20 +70,106 @@ bool static CommandGraphicsModeOff()
 
 bool static ProcessEnterVideoAttribute(bool receive)
 {	
+	switch (g_consumedKeys[0])
+	{
+	case '@':
+		CommandNormalVideo();
+		break;
+	case 'A':
+		CommandStartHalfIntensity();
+		break;
+	case 'B':
+		CommandStartBlink();
+		break;
+	case 'C':
+		CommandStartHalfIntensity();
+		CommandStartBlink();
+		break;
+	case 'P':
+		CommandStartReverse();
+		break;
+	case 'Q':
+		CommandStartReverse();
+		CommandStartHalfIntensity();
+		break;
+	case 'R':
+		CommandStartReverse();
+		CommandStartBlink();
+		break;
+	case 'S':
+		CommandStartReverse();
+		CommandStartHalfIntensity();
+		CommandStartBlink();
+		break;
+	case '`':
+		CommandStartUnderline();
+		break;
+	case 'a':
+		CommandStartUnderline();
+		CommandStartHalfIntensity();
+		break;
+	case 'b':
+		CommandStartUnderline();
+		CommandStartBlink();
+		break;
+	case 'c':
+		CommandStartUnderline();
+		CommandStartHalfIntensity();
+		CommandStartBlink();
+		break;
+	case 'p':
+		CommandStartUnderline();
+		CommandStartReverse();
+		break;
+	case 'q':
+		CommandStartUnderline();
+		CommandStartReverse();
+		CommandStartHalfIntensity();
+		break;
+	case 'r':
+		CommandStartUnderline();
+		CommandStartReverse();
+		CommandStartBlink();
+		break;
+	case 's':
+		CommandStartUnderline();
+		CommandStartReverse();
+		CommandStartHalfIntensity();
+		CommandStartBlink();
+		break;
+	case '$':
+		CommandStartInvisible();
+		break;
+	case '4':
+		CommandStartInvisible();
+		CommandStartReverse();
+		break;
+	case '5':
+		CommandStartInvisible();
+		CommandStartReverse();
+		CommandStartHalfIntensity();
+		break;
+	case '6':
+		CommandStartInvisible();
+		CommandStartReverse();
+		CommandStartBlink();
+		break;
+	case '7':
+		CommandStartInvisible();
+		CommandStartReverse();
+		CommandStartBlink();
+		CommandStartHalfIntensity();
+		break;
+	}
+		
 	return true;
 }
-
 
 bool static CommandEnterVideoAttribute()
 {
 	g_keysToConsume = 1;
 	g_keysConsumedCallback = ProcessEnterVideoAttribute;
 	
-	return true;
-}
-
-bool static CommandDeleteVideoAttribute()
-{	
 	return true;
 }
 
@@ -110,7 +197,7 @@ void Cromemco3102::AssignCommands()
 	CommandAssignment['S'] = CommandGraphicsModeOff;
 	CommandAssignment['Z'] = CommandCursorToggle;
 	CommandAssignment['d'] = CommandEnterVideoAttribute;
-	CommandAssignment['e'] = CommandDeleteVideoAttribute;
+	CommandAssignment['e'] = CommandNormalVideo;
 	CommandAssignment['l'] = CommandStartBlink;
 	CommandAssignment['m'] = CommandNormalVideo;
 	//CommandAssignment['['] = CommandVT100EscapeCode;	
@@ -165,7 +252,7 @@ bool Cromemco3102::ProcessCommand(wchar_t& c, bool receive)
 			int h, v;
 		
 			GetCurrentScreenPosition(v, h);
-			MoveCursor(v, h - 1);
+			CommandMoveCursor(v, h - 1);
 		}
 		else if (c == ENQ)
 		{
@@ -208,7 +295,7 @@ bool Cromemco3102::ShouldTransmit(wchar_t c)
 
 wchar_t Cromemco3102::TransformReceived(wchar_t c)
 {
-	if (!isGraphicsMode)
+	if (!isGraphicsMode || c < 0x40 || c > 0x6B)
 		return c;
 	
 	switch (c)
@@ -221,10 +308,12 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x250C;
 		break;
 	case 'B':
-		return 0x250F;
+		c = 0x250F;
+		CommandStartBlink();
 		break;
 	case 'C':
-		return 0x250C;
+		c = 0x250C;
+		CommandStartBlink();
 		break;
 	// Upper Right Corner
 	case 'D':
@@ -234,10 +323,12 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x2510;
 		break;
 	case 'F':
-		return 0x2513;
+		c = 0x2513;
+		CommandStartBlink();
 		break;
 	case 'G':
-		return 0x2510;
+		c = 0x2510;
+		CommandStartBlink();
 		break;
 	// Lower Left Corner
 	case 'H':
@@ -247,10 +338,12 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x2514;
 		break;
 	case 'J':
-		return 0x2517;
+		c = 0x2517;
+		CommandStartBlink();
 		break;
 	case 'K':
-		return 0x2514;
+		c = 0x2514;
+		CommandStartBlink();
 		break;
 	// Lower Right Corner
 	case 'L':
@@ -260,10 +353,12 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x2518;
 		break;
 	case 'N':
-		return 0x251B;
+		c = 0x251B;
+		CommandStartBlink();
 		break;
 	case 'O':
-		return 0x2518;
+		c = 0x2518;
+		CommandStartBlink();
 		break;
 	// Upper 'T'
 	case 'P':
@@ -273,10 +368,12 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x252C;
 		break;
 	case 'R':
-		return 0x2533;
+		c = 0x2533;
+		CommandStartBlink();
 		break;
 	case 'S':
-		return 0x252C;
+		c = 0x252C;
+		CommandStartBlink();
 		break;
 	// Right 'T'
 	case 'T':
@@ -286,10 +383,12 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x2524;
 		break;
 	case 'V':
-		return 0x252B;
+		c = 0x252B;
+		CommandStartBlink();
 		break;
 	case 'W':
-		return 0x2524;
+		c = 0x2524;
+		CommandStartBlink();
 		break;
 	// Left 'T'
 	case 'X':
@@ -299,10 +398,12 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x251C;
 		break;
 	case 'Z':
-		return 0x2523;
+		c = 0x2523;
+		CommandStartBlink();
 		break;
 	case '[':
-		return 0x251C;
+		c = 0x251C;
+		CommandStartBlink();
 		break;
 	// Bottom 'T'
 	case '\\':
@@ -312,23 +413,27 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x2534;
 		break;
 	case '^':
-		return 0x253B;
+		c = 0x253B;
+		CommandStartBlink();
 		break;
 	case '_':
-		return 0x2534;
+		c = 0x2534;
+		CommandStartBlink();
 		break;
 	// Horiztonal Line
 	case '`':
-		return 0x2501;
+		return L'\u2501';
 		break;
 	case 'a':
 		return 0x2500;
 		break;
 	case 'b':
-		return 0x2501;
+		c = 0x2501;
+		CommandStartBlink();
 		break;
 	case 'c':
-		return 0x2500;
+		c = 0x2500;
+		CommandStartBlink();
 		break;
 	// Vertical Line
 	case 'd':
@@ -338,10 +443,12 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x2502;
 		break;
 	case 'f':
-		return 0x2503;
+		c = 0x2503;
+		CommandStartBlink();
 		break;
 	case 'g':
-		return 0x2502;
+		c = 0x2502;
+		CommandStartBlink();
 		break;
 	// Cross
 	case 'h':
@@ -351,13 +458,31 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x253C;
 		break;
 	case 'j':
-		return 0x254B;
+		c = 0x254B;
+		CommandStartBlink();
 		break;
 	case 'k':
-		return 0x253C;
-		break;
-	default:
-		return c;
+		c = 0x253C;
+		CommandStartBlink();
 		break;
 	}
+	
+	return c;
+}
+
+
+int Cromemco3102::NextTabStop(int h)
+{
+	h -= 1;
+	
+	h = (h + 8) - (h % 8);
+	
+	if (h > 72)
+	{
+		h = 0;
+	}
+	
+	h += 1;
+
+	return h;
 }
