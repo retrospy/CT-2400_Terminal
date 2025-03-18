@@ -1,1 +1,1 @@
-# ct-1024_emulator
+# CT-2400 Terminal Emulator
