@@ -15,9 +15,8 @@
 #define		DOWN	CTRL_J
 #define		LEFT	BS
 #define		RIGHT	CTRL_L
-
-                                        // 12345678901234567890123456789012345678901234567890123456789012345678901234567890
-static char startupMessage[COLUMNS + 1] = "                    ******   Cromemco 3102 Mode   ******                        ";
+//                                             12345678901234567890123456789012345678901234567890123456789012345678901234567890
+static wchar_t startupMessage[COLUMNS + 1] = L"                    ******   Cromemco 3102 Mode   ******                        ";
 
 bool static ProcessPositionCursor(bool receive)
 {
@@ -76,89 +75,64 @@ bool static ProcessEnterVideoAttribute(bool receive)
 		CommandNormalVideo();
 		break;
 	case 'A':
-		CommandStartHalfIntensity();
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'B':
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case 'C':
-		CommandStartHalfIntensity();
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	case 'P':
-		CommandStartReverse();
+		CommandStartVideoAttribute(VA_REVERSE);
 		break;
 	case 'Q':
-		CommandStartReverse();
-		CommandStartHalfIntensity();
+		CommandStartVideoAttribute(VA_REVERSE | VA_HALF_INTENSITY);
 		break;
 	case 'R':
-		CommandStartReverse();
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_REVERSE | VA_BLINK);
 		break;
 	case 'S':
-		CommandStartReverse();
-		CommandStartHalfIntensity();
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_REVERSE | VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	case '`':
-		CommandStartUnderline();
+		CommandStartVideoAttribute(VA_UNDERLINE);
 		break;
 	case 'a':
-		CommandStartUnderline();
-		CommandStartHalfIntensity();
+		CommandStartVideoAttribute(VA_UNDERLINE | VA_HALF_INTENSITY);
 		break;
 	case 'b':
-		CommandStartUnderline();
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_UNDERLINE | VA_BLINK);
 		break;
 	case 'c':
-		CommandStartUnderline();
-		CommandStartHalfIntensity();
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_UNDERLINE | VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	case 'p':
-		CommandStartUnderline();
-		CommandStartReverse();
+		CommandStartVideoAttribute(VA_UNDERLINE | VA_REVERSE);
 		break;
 	case 'q':
-		CommandStartUnderline();
-		CommandStartReverse();
-		CommandStartHalfIntensity();
+		CommandStartVideoAttribute(VA_UNDERLINE | VA_REVERSE | VA_HALF_INTENSITY);
 		break;
 	case 'r':
-		CommandStartUnderline();
-		CommandStartReverse();
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_UNDERLINE | VA_REVERSE | VA_BLINK);
 		break;
 	case 's':
-		CommandStartUnderline();
-		CommandStartReverse();
-		CommandStartHalfIntensity();
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_UNDERLINE | VA_REVERSE | VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	case '$':
-		CommandStartInvisible();
+		CommandStartVideoAttribute(VA_INVISIBLE);
 		break;
 	case '4':
-		CommandStartInvisible();
-		CommandStartReverse();
+		CommandStartVideoAttribute(VA_INVISIBLE | VA_REVERSE);
 		break;
 	case '5':
-		CommandStartInvisible();
-		CommandStartReverse();
-		CommandStartHalfIntensity();
+		CommandStartVideoAttribute(VA_INVISIBLE | VA_REVERSE | VA_HALF_INTENSITY);
 		break;
 	case '6':
-		CommandStartInvisible();
-		CommandStartReverse();
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_INVISIBLE | VA_REVERSE | VA_BLINK);
 		break;
 	case '7':
-		CommandStartInvisible();
-		CommandStartReverse();
-		CommandStartBlink();
-		CommandStartHalfIntensity();
+		CommandStartVideoAttribute(VA_INVISIBLE | VA_REVERSE | VA_BLINK | VA_HALF_INTENSITY);
 		break;
 	}
 		
@@ -283,7 +257,7 @@ void Cromemco3102::TerminalLoop1(int pins)
 
 }
 
-char* Cromemco3102::StartupMessage()
+wchar_t* Cromemco3102::StartupMessage()
 {
 	return startupMessage;
 }
@@ -295,6 +269,7 @@ bool Cromemco3102::ShouldTransmit(wchar_t c)
 
 wchar_t Cromemco3102::TransformReceived(wchar_t c)
 {
+	
 	if (!isGraphicsMode || c < 0x40 || c > 0x6B)
 		return c;
 	
@@ -305,165 +280,176 @@ wchar_t Cromemco3102::TransformReceived(wchar_t c)
 		return 0x250F;
 		break;
 	case 'A':
-		return 0x250C;
+		c = 0x250F;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'B':
 		c = 0x250F;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case 'C':
-		c = 0x250C;
-		CommandStartBlink();
+		c = 0x250F;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Upper Right Corner
 	case 'D':
 		return 0x2513;
 		break;
 	case 'E':
-		return 0x2510;
+		c = 0x2513;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'F':
 		c = 0x2513;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case 'G':
-		c = 0x2510;
-		CommandStartBlink();
+		c = 0x2513;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Lower Left Corner
 	case 'H':
 		return 0x2517;
 		break;
 	case 'I':
-		return 0x2514;
+		c = 0x2517;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'J':
 		c = 0x2517;
-		CommandStartBlink();
+		
 		break;
 	case 'K':
-		c = 0x2514;
-		CommandStartBlink();
+		c = 0x2517;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Lower Right Corner
 	case 'L':
 		return 0x251B;
 		break;
 	case 'M':
-		return 0x2518;
+		c = 0x251B;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'N':
 		c = 0x251B;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case 'O':
-		c = 0x2518;
-		CommandStartBlink();
+		c = 0x251B;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Upper 'T'
 	case 'P':
 		return 0x2533;
 		break;
 	case 'Q':
-		return 0x252C;
+		c = 0x2533;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'R':
 		c = 0x2533;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case 'S':
-		c = 0x252C;
-		CommandStartBlink();
+		c = 0x2533;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Right 'T'
 	case 'T':
 		return 0x252B;
 		break;
 	case 'U':
-		return 0x2524;
+		c = 0x252B;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'V':
 		c = 0x252B;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case 'W':
-		c = 0x2524;
-		CommandStartBlink();
+		c = 0x252B;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Left 'T'
 	case 'X':
 		return 0x2523;
 		break;
 	case 'Y':
-		return 0x251C;
+		c = 0x2523;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'Z':
 		c = 0x2523;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case '[':
-		c = 0x251C;
-		CommandStartBlink();
+		c = 0x2523;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Bottom 'T'
 	case '\\':
 		return 0x253B;
 		break;
 	case ']':
-		return 0x2534;
+		c = 0x253B;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case '^':
 		c = 0x253B;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case '_':
-		c = 0x2534;
-		CommandStartBlink();
+		c = 0x253B;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Horiztonal Line
 	case '`':
-		return L'\u2501';
+		return 0x2501;
 		break;
 	case 'a':
-		return 0x2500;
+		c = 0x2501;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'b':
 		c = 0x2501;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case 'c':
-		c = 0x2500;
-		CommandStartBlink();
+		c = 0x2501;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Vertical Line
 	case 'd':
 		return 0x2503;
 		break;
 	case 'e':
-		return 0x2502;
+		c = 0x2503;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'f':
 		c = 0x2503;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case 'g':
-		c = 0x2502;
-		CommandStartBlink();
+		c = 0x2503;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	// Cross
 	case 'h':
 		return 0x254B;
 		break;
 	case 'i':
-		return 0x253C;
+		c = 0x254B;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY);
 		break;
 	case 'j':
 		c = 0x254B;
-		CommandStartBlink();
+		CommandStartVideoAttribute(VA_BLINK);
 		break;
 	case 'k':
-		c = 0x253C;
-		CommandStartBlink();
+		c = 0x254B;
+		CommandStartVideoAttribute(VA_HALF_INTENSITY | VA_BLINK);
 		break;
 	}
 	

@@ -45,6 +45,13 @@
 #define ARROW_RIGHT			ARROW_KEY_OFFSET + 2
 #define ARROW_LEFT			ARROW_KEY_OFFSET + 3
 
+#define VA_NORMAL			0x01
+#define VA_HALF_INTENSITY	0x02
+#define VA_BLINK			0x04
+#define VA_REVERSE			0x08
+#define VA_UNDERLINE		0x10
+#define VA_INVISIBLE		0x20
+
 extern bool CommandCursorUp();
 extern bool CommandCursorDown();
 extern bool CommandCursorRight();
@@ -56,14 +63,12 @@ extern bool CommandEraseToEOL();
 extern bool CommandInsertLine();
 extern bool CommandDeleteLine();
 extern bool CommandCursorToggle();
-extern bool CommandStartBlink();
-extern bool CommandStartReverse();
-extern bool CommandStartHalfIntensity();
-extern bool CommandStartUnderline();
-extern bool CommandStartInvisible();
 extern bool CommandNormalVideo();
+extern bool CommandStartBlink();
+extern bool CommandStartVideoAttribute(byte attributes);
 extern bool CommandMoveCursor(int v, int h);
-extern bool CommandVT100EscapeCode();
+extern int getCurrentPage();
+
 extern bool IsLocalEchoOn();
 extern void TerminalSetup();
 extern void GetCurrentScreenPosition(int& v, int& h);

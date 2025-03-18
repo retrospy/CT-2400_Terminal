@@ -44,8 +44,14 @@ struct FlashConfig
 	int TerminalType;
 };
 
+struct BufferEntry
+{
+	wchar_t Character;
+	byte VideoAttributes;
+};
+
 // Buffer goes from 1 to ROWS/COLUMNS, so column and row 0 are ignored 
-wchar_t pageBuffer[PAGES][ROWS + 1][COLUMNS + 1];  
+BufferEntry pageBuffer[PAGES][ROWS + 1][COLUMNS + 1];  
 volatile int currentPageBuffer = 0;
 volatile int newPageBuffer = 0;
 Position currentPageBufferPosition[PAGES];
@@ -78,6 +84,11 @@ mbchar wchar_to_utf8(wchar_t c) {
 		result.utf8[3] = 0;
 	}
 	return result;
+}
+
+int getCurrentPage()
+{
+	return currentPageBuffer;
 }
 
 int GetBaudRate()
@@ -198,7 +209,7 @@ void WriteCharactorToCurrentPageBuffer(wchar_t c)
 //	Serial.println(currentPageBufferPosition[currentPageBuffer].h);
 		
 	pageBuffer[currentPageBuffer][GenerateRealRowPosition(currentPageBufferPosition[currentPageBuffer].v)]
-		                         [currentPageBufferPosition[currentPageBuffer].h] = hasLowercase ? c : toupper(c);
+		                         [currentPageBufferPosition[currentPageBuffer].h].Character = hasLowercase ? c : toupper(c);
 }
 
 
@@ -330,7 +341,9 @@ bool CommandEraseToEOL()
 		GetCurrentScreenPosition(v, h);
 	
 		for (int i = h; i <= COLUMNS; ++i)
-			pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = ' ';
+		{
+			pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = {' ', VA_NORMAL};
+		}
 	}	
 	
 	return true;
@@ -346,18 +359,18 @@ bool CommandEraseToEOF()
 		GetCurrentScreenPosition(v, h);
 	
 		for (int i = h; i <= COLUMNS; ++i)
-			pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = ' ';
+			pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = {' ', VA_NORMAL};
 	
 		for (int j = firstRowOfPageBuffer[currentPageBuffer] + 1; j <= ROWS; ++j)
 			for (int k = 1; k <= COLUMNS; ++k)
 			{
-				pageBuffer[currentPageBuffer][j][k] = ' ';
+				pageBuffer[currentPageBuffer][j][k] = { ' ', VA_NORMAL };
 			}
 		
 		for (int j = 1; j <= firstRowOfPageBuffer[currentPageBuffer] - 1; ++j)
 			for (int k = 1; k <= COLUMNS; ++k)
 			{
-				pageBuffer[currentPageBuffer][j][k] = ' ';
+				pageBuffer[currentPageBuffer][j][k] = { ' ', VA_NORMAL };
 			}
 	}
 	
@@ -374,7 +387,7 @@ bool CommandEraseAll()
 		for (int j = 1; j <= ROWS; ++j)
 			for (int k = 1; k <= COLUMNS; ++k)
 			{
-				pageBuffer[currentPageBuffer][j][k] = ' ';
+				pageBuffer[currentPageBuffer][j][k] = {' ', VA_NORMAL};
 			}
 	}
 	
@@ -391,7 +404,7 @@ bool CommandEraseLine()
 		GetCurrentScreenPosition(v, h);
 	
 		for (int i = 0; i <= COLUMNS; ++i)
-			pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = ' ';
+			pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = {' ', VA_NORMAL};
 	}
 	
 	return true;
@@ -425,46 +438,75 @@ bool CommandCursorToggle()
 	return true;
 }
 
-bool CommandStartHalfIntensity()
+bool CommandStartVideoAttribute(byte attributes)
 {
-	Serial.printf("%c[2m", 27);
 	
-	return true;
-}
-
-bool CommandStartReverse()
-{
-	Serial.printf("%c[7m", 27);
+	int v, h;
+	GetCurrentScreenPosition(v, h);
 	
-	return true;
-}
+	pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][h].VideoAttributes = attributes;
+	
+	if ((attributes & VA_NORMAL) != 0)
+	{
+		pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][h].VideoAttributes = VA_NORMAL;
+		Serial.printf("%c[m", 27);
+		return true;
+	}
 
-bool CommandStartUnderline()
-{
-	Serial.printf("%c[4m", 27);
+	bool firstAttribute = true;
+	
+	Serial.printf("%c[", 27);
+	
+	if ((attributes & VA_HALF_INTENSITY) != 0)
+	{
+		if (!firstAttribute)
+			Serial.printf(";");
+		Serial.print("2");
+		firstAttribute = false;
+	}
+	if ((attributes & VA_UNDERLINE) != 0)
+	{
+		if (!firstAttribute)
+			Serial.printf(";");
+		Serial.print("4");
+		firstAttribute = false;
+	}
+	if ((attributes & VA_BLINK) != 0)
+	{
+		if (!firstAttribute)
+			Serial.printf(";");
+		Serial.print("5");
+		firstAttribute = false;
+	}
+	if ((attributes & VA_REVERSE) != 0)
+	{
+		if (!firstAttribute)
+			Serial.printf(";");
+		Serial.print("7");
+		firstAttribute = false;
+	}
+	if ((attributes & VA_INVISIBLE) != 0)
+	{
+		if (!firstAttribute)
+			Serial.printf(";");
+		Serial.print("8");
+		firstAttribute = false;
+	}
+	Serial.printf("m");
 	
 	return true;
 }
 
 bool CommandStartBlink()
 {
-	Serial.printf("%c[5m", 27);
-	
-	return true;
-}
-
-bool CommandStartInvisible()
-{
-	Serial.printf("%c[8m", 27);
+	return CommandStartVideoAttribute(VA_BLINK);
 	
 	return true;
 }
 
 bool CommandNormalVideo()
 {
-	Serial.printf("%c[m", 27);
-	
-	return true;
+	return CommandStartVideoAttribute(VA_NORMAL);
 }
 
 bool CommandDeleteLine()
@@ -484,13 +526,15 @@ bool CommandDeleteLine()
 		{
 			pageBuffer[currentPageBuffer][GenerateRealRowPosition(j - 1)][k] = 
 						pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k];
-			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k]).utf8);
+			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k].Character).utf8);
+			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k].VideoAttributes);
 		}
 
 	for (int k = 1; k <= COLUMNS; ++k)
 	{
-		pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k] = ' ';
-		Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k]).utf8);
+		pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k] = { ' ', VA_NORMAL };
+		Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k].Character).utf8);
+		//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k].VideoAttributes);
 	}
 		
 	MoveCursor(v, h);
@@ -515,7 +559,7 @@ bool CommandInsertLine()
 
 	for (int k = 1; k <= COLUMNS; ++k)
 	{
-		pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][k] = ' ';
+		pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][k] = { ' ', VA_NORMAL };
 	}
 	
 	MoveCursor(v, 1);
@@ -524,7 +568,8 @@ bool CommandInsertLine()
 	{
 		for (int j = 1; j <= COLUMNS; ++j)
 		{
-			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][GenerateRealRowPosition(i)][j]).utf8);
+			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][GenerateRealRowPosition(i)][j].Character).utf8);
+			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][GenerateRealRowPosition(i)][j].VideoAttributes);
 		}
 	}
 	
@@ -672,7 +717,7 @@ void ProcessReceivedByte(wchar_t c)
 
 		wchar_t charToDisplay = terminal->TransformReceived(c);
 
-		Serial.write(hasLowercase ? charToDisplay : toupper(charToDisplay));
+		Serial.write(wchar_to_utf8(hasLowercase ? charToDisplay : toupper(charToDisplay)).utf8);
 		
 		WriteCharactorToCurrentPageBuffer(charToDisplay);
 		
@@ -722,13 +767,15 @@ void SwapPages()
 	for (int j = firstRowOfPageBuffer[currentPageBuffer]; j <= ROWS; ++j)
 		for (int k = 1; k <= COLUMNS; ++k)
 		{
-			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][j][k]).utf8);
+			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][j][k].Character).utf8);
+			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][j][k].VideoAttributes);
 		}
 		
 	for (int j = 1; j <= firstRowOfPageBuffer[currentPageBuffer] - 1; ++j)
 		for (int k = 1; k <= COLUMNS; ++k)
 		{
-			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][j][k]).utf8);
+			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][j][k].Character).utf8);
+			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][j][k].VideoAttributes);
 		}
 		
 	MoveCursor(currentPageBufferPosition[currentPageBuffer].v, currentPageBufferPosition[currentPageBuffer].h);
@@ -746,7 +793,8 @@ void initScreen()
 	for (int j = 1; j <= ROWS; ++j)
 		for (int k = 1; k <= COLUMNS; ++k)
 		{
-			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][j][k]).utf8);
+			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][j][k].Character).utf8);
+			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][j][k].VideoAttributes);
 		}
 	
 	MoveCursor(9, 1);
@@ -765,21 +813,21 @@ void initPageBuffer()
 				if (i == currentPageBuffer)
 				{
 					if (j == 1)
-						pageBuffer[i][j][k] = hasLowercase ? startupMessage[0][k - 1] : toupper(startupMessage[0][k - 1]);		
+						pageBuffer[i][j][k] = { hasLowercase ? startupMessage[0][k - 1] : toupper(startupMessage[0][k - 1]), VA_NORMAL };	
 					else if (j == 3)
-						pageBuffer[i][j][k] = hasLowercase ? startupMessage[1][k - 1] : toupper(startupMessage[1][k - 1]);	
+						pageBuffer[i][j][k] = { hasLowercase ? startupMessage[1][k - 1] : toupper(startupMessage[1][k - 1]), VA_NORMAL };
 					else if (j == 5)
-						pageBuffer[i][j][k] = hasLowercase ? startupMessage[2][k - 1] : toupper(startupMessage[2][k - 1]);
+						pageBuffer[i][j][k] = { hasLowercase ? startupMessage[2][k - 1] : toupper(startupMessage[2][k - 1]), VA_NORMAL };
 					else if (j == 7)
-						pageBuffer[i][j][k] = hasLowercase ? terminal->StartupMessage()[k - 1] : toupper(terminal->StartupMessage()[k - 1]);
+						pageBuffer[i][j][k] = { hasLowercase ? terminal->StartupMessage()[k - 1] : toupper(terminal->StartupMessage()[k - 1]), VA_NORMAL };
 					else
 					{
-						pageBuffer[i][j][k] = ' ';					
+						pageBuffer[i][j][k] = { ' ', VA_NORMAL };					
 					}
 				}
 				else
 				{
-					pageBuffer[i][j][k] = ' ';	
+					pageBuffer[i][j][k] = { ' ', VA_NORMAL };		
 				}
 			}
 	
@@ -1031,7 +1079,8 @@ void HandleSend()
 				case 'B':
 				case 'C':
 				case 'D':
-					ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
+					if (cursorOn)
+						ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
 					break;
 				default:
 					ProcessSentByte(0x1B);

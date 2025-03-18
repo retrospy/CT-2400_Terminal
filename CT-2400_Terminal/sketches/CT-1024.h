@@ -14,7 +14,7 @@ public:
 	virtual wchar_t TransformReceived(wchar_t c);
 	virtual void TerminalSetup();
 	virtual void TerminalLoop1(int pins);
-	virtual char* StartupMessage();
+	virtual wchar_t* StartupMessage();
 	virtual bool ShouldTransmit(wchar_t c);
 	virtual int NextTabStop(int h);
 		

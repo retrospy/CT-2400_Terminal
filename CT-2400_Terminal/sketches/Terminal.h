@@ -14,7 +14,7 @@ public:
 	
 	virtual void TerminalSetup() = 0;
 	virtual void TerminalLoop1(int pins) = 0;
-	virtual char* StartupMessage() = 0;
+	virtual wchar_t* StartupMessage() = 0;
 	virtual bool ShouldTransmit(wchar_t c) = 0;
 	
 	virtual int NextTabStop(int h) = 0;

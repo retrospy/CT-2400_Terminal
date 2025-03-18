@@ -8,8 +8,8 @@
 #define RDR_OFF     18
 #define RDR_ON      19
 
-									  // 12345678901234567890123456789012345678901234567890123456789012345678901234567890
-static char startupMessage[COLUMNS+1] = "                    ******   SWTPC CT-1024 Mode   ******                        ";
+//									         12345678901234567890123456789012345678901234567890123456789012345678901234567890
+static wchar_t startupMessage[COLUMNS+1] = L"                    ******   SWTPC CT-1024 Mode   ******                        ";
 
 static volatile bool useAC30Commands = false;
 
@@ -119,7 +119,7 @@ void CT_1024::TerminalLoop1(int pins)
 	useAC30Commands = (pins & (1 << AC30_CMD)) != 0;
 }
 
-char* CT_1024::StartupMessage()
+wchar_t* CT_1024::StartupMessage()
 {
 	return startupMessage;
 }
