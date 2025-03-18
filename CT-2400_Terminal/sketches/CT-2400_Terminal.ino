@@ -1077,14 +1077,19 @@ void setup()
 
 void HandleSend()
 {
-	//if (Serial.available() >= 3)
+	// NOTE: available() seems to only return 1 in minicom
+	// plus there is a small delay between read() and 
+	// when available() is true again.
+	//if (Serial.available() >= 3)  
 	//{
 		if (Serial.peek() == 0x1B)
 		{
 			wchar_t c = Serial.read();
+			delay(10);
 			if (Serial.available() && Serial.peek() == '[')
 			{
 				Serial.read();
+				delay(10);
 				
 				if (Serial.available())
 				{
@@ -1095,7 +1100,7 @@ void HandleSend()
 					case 'B':
 					case 'C':
 					case 'D':
-						if (cursorOn)
+						if (cursorOn)  // TODO: This doesn't work as expected
 							ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
 						break;
 					default:
@@ -1120,7 +1125,7 @@ void HandleSend()
 		{
 			ProcessSentByte(Serial.read());
 		}
-	}
+	//}
 	//else
 	//{
 	//	ProcessSentByte(Serial.read());
