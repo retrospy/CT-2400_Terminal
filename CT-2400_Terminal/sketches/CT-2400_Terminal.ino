@@ -1077,29 +1077,38 @@ void setup()
 
 void HandleSend()
 {
-	if (Serial.available() >= 3)
-	{
+	//if (Serial.available() >= 3)
+	//{
 		if (Serial.peek() == 0x1B)
 		{
 			wchar_t c = Serial.read();
-			if (Serial.peek() == '[')
+			if (Serial.available() && Serial.peek() == '[')
 			{
 				Serial.read();
-				c = Serial.read();
-				switch (c)  // VT-100 Command to Follow
+				
+				if (Serial.available())
 				{
-				case 'A':
-				case 'B':
-				case 'C':
-				case 'D':
-					if (cursorOn)
-						ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
-					break;
-				default:
+					c = Serial.read();
+					switch (c)  // VT-100 Command to Follow
+					{
+					case 'A':
+					case 'B':
+					case 'C':
+					case 'D':
+						if (cursorOn)
+							ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
+						break;
+					default:
+						ProcessSentByte(0x1B);
+						ProcessSentByte('[');
+						ProcessSentByte(c);
+						break;
+					}
+				}
+				else
+				{
 					ProcessSentByte(0x1B);
 					ProcessSentByte('[');
-					ProcessSentByte(c);
-					break;
 				}
 			}
 			else
@@ -1112,10 +1121,10 @@ void HandleSend()
 			ProcessSentByte(Serial.read());
 		}
 	}
-	else
-	{
-		ProcessSentByte(Serial.read());
-	}
+	//else
+	//{
+	//	ProcessSentByte(Serial.read());
+	//}
 }
 
 void loop() 
