@@ -8,7 +8,9 @@
 
 #include "wchar.h"
 
-#define BUFFER_SIZE		1024
+#include <string>
+
+#define BUFFER_SIZE		2400
 
 Terminal* terminal = nullptr;
 
@@ -438,64 +440,75 @@ bool CommandCursorToggle()
 	return true;
 }
 
-bool CommandStartVideoAttribute(byte attributes)
+bool CommandStartVideoAttribute(byte attributes, int v, int h)
 {
+	//if (attributes == pageBuffer[currentPageBuffer][v][h].VideoAttributes)
+	//	return true;
 	
-	int v, h;
-	GetCurrentScreenPosition(v, h);
+	pageBuffer[currentPageBuffer][v][h].VideoAttributes = attributes;
 	
-	pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][h].VideoAttributes = attributes;
-	
-	if ((attributes & VA_NORMAL) != 0)
+	if (attributes == VA_NORMAL)
 	{
-		pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][h].VideoAttributes = VA_NORMAL;
 		Serial.printf("%c[m", 27);
 		return true;
 	}
 
 	bool firstAttribute = true;
+	std::string command;
 	
-	Serial.printf("%c[", 27);
+	command.push_back(27);
+	command.push_back('[');
 	
 	if ((attributes & VA_HALF_INTENSITY) != 0)
 	{
 		if (!firstAttribute)
-			Serial.printf(";");
-		Serial.print("2");
+			command.push_back(';');
+		command.push_back('2');
 		firstAttribute = false;
 	}
 	if ((attributes & VA_UNDERLINE) != 0)
 	{
 		if (!firstAttribute)
-			Serial.printf(";");
-		Serial.print("4");
+			command.push_back(';');
+		command.push_back('4');
 		firstAttribute = false;
 	}
 	if ((attributes & VA_BLINK) != 0)
 	{
 		if (!firstAttribute)
-			Serial.printf(";");
-		Serial.print("5");
+			command.push_back(';');
+		command.push_back('5');
 		firstAttribute = false;
 	}
 	if ((attributes & VA_REVERSE) != 0)
 	{
 		if (!firstAttribute)
-			Serial.printf(";");
-		Serial.print("7");
+			command.push_back(';');
+		command.push_back('7');
 		firstAttribute = false;
 	}
 	if ((attributes & VA_INVISIBLE) != 0)
 	{
 		if (!firstAttribute)
-			Serial.printf(";");
-		Serial.print("8");
+			command.push_back(';');
+		command.push_back('8');
 		firstAttribute = false;
 	}
-	Serial.printf("m");
+	command.push_back('m');
+	
+	Serial.write(command.c_str());
 	
 	return true;
 }
+
+bool CommandStartVideoAttribute(byte attributes)
+{
+	int v, h;
+	GetCurrentScreenPosition(v, h);
+	
+	return CommandStartVideoAttribute(attributes, v, h);
+}
+
 
 bool CommandStartBlink()
 {
@@ -527,14 +540,14 @@ bool CommandDeleteLine()
 			pageBuffer[currentPageBuffer][GenerateRealRowPosition(j - 1)][k] = 
 						pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k];
 			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k].Character).utf8);
-			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k].VideoAttributes);
+			CommandStartVideoAttribute(pageBuffer[currentPageBuffer][GenerateRealRowPosition(j)][k].VideoAttributes, GenerateRealRowPosition(j), k);
 		}
 
 	for (int k = 1; k <= COLUMNS; ++k)
 	{
 		pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k] = { ' ', VA_NORMAL };
 		Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k].Character).utf8);
-		//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k].VideoAttributes);
+		CommandStartVideoAttribute(pageBuffer[currentPageBuffer][GenerateRealRowPosition(ROWS)][k].VideoAttributes, GenerateRealRowPosition(ROWS), k);
 	}
 		
 	MoveCursor(v, h);
@@ -569,7 +582,7 @@ bool CommandInsertLine()
 		for (int j = 1; j <= COLUMNS; ++j)
 		{
 			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][GenerateRealRowPosition(i)][j].Character).utf8);
-			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][GenerateRealRowPosition(i)][j].VideoAttributes);
+			CommandStartVideoAttribute(pageBuffer[currentPageBuffer][GenerateRealRowPosition(i)][j].VideoAttributes, GenerateRealRowPosition(i), j);
 		}
 	}
 	
@@ -768,14 +781,14 @@ void SwapPages()
 		for (int k = 1; k <= COLUMNS; ++k)
 		{
 			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][j][k].Character).utf8);
-			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][j][k].VideoAttributes);
+			CommandStartVideoAttribute(pageBuffer[currentPageBuffer][j][k].VideoAttributes, j, k);
 		}
 		
 	for (int j = 1; j <= firstRowOfPageBuffer[currentPageBuffer] - 1; ++j)
 		for (int k = 1; k <= COLUMNS; ++k)
 		{
 			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][j][k].Character).utf8);
-			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][j][k].VideoAttributes);
+			CommandStartVideoAttribute(pageBuffer[currentPageBuffer][j][k].VideoAttributes, j, k);
 		}
 		
 	MoveCursor(currentPageBufferPosition[currentPageBuffer].v, currentPageBufferPosition[currentPageBuffer].h);
@@ -794,7 +807,7 @@ void initScreen()
 		for (int k = 1; k <= COLUMNS; ++k)
 		{
 			Serial.write(wchar_to_utf8(pageBuffer[currentPageBuffer][j][k].Character).utf8);
-			//CommandStartVideoAttribute(pageBuffer[currentPageBuffer][j][k].VideoAttributes);
+			CommandStartVideoAttribute(pageBuffer[currentPageBuffer][j][k].VideoAttributes, j, k);
 		}
 	
 	MoveCursor(9, 1);
@@ -1126,26 +1139,34 @@ void loop()
 		SwapPages();
 	}
 
-	if (Serial1.available())
-	{
-		wchar_t temp_buffer[BUFFER_SIZE];
-		int count = min(BUFFER_SIZE, Serial1.available());
-		
-		for(int i = 0; i < count; ++i)
-			temp_buffer[i] = Serial1.read();
-		inputBuffer.insert(inputBuffer.cend(), temp_buffer, temp_buffer + count);
-	}
+//	if (Serial1.available())
+//	{
+//		wchar_t temp_buffer[BUFFER_SIZE];
+//		int count = min(BUFFER_SIZE, Serial1.available());
+//		
+//		for(int i = 0; i < count; ++i)
+//			temp_buffer[i] = Serial1.read();
+//		inputBuffer.insert(inputBuffer.cend(), temp_buffer, temp_buffer + count);
+//	}
 	
-	wchar_t c;
 	if (Serial.available()) 
-	{   		
+	{   	
 		HandleSend();
 	}
 	
-	if (!inputBuffer.empty())
+	if (Serial1.available())
 	{
-		c = inputBuffer.front();
-		inputBuffer.pop_front();
-		ProcessReceivedByte(c);
+		ProcessReceivedByte(Serial1.read());
 	}
+	
+//	if (!inputBuffer.empty())
+//	{
+//		int count = inputBuffer.size();
+//		for (int i = 0; i < count; ++i)	
+//		{	
+//			c = inputBuffer.front();
+//			inputBuffer.pop_front();
+//			ProcessReceivedByte(c);
+//		}
+//	}
 }

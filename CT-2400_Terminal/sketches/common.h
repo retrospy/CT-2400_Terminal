@@ -45,7 +45,7 @@
 #define ARROW_RIGHT			ARROW_KEY_OFFSET + 2
 #define ARROW_LEFT			ARROW_KEY_OFFSET + 3
 
-#define VA_NORMAL			0x01
+#define VA_NORMAL			0x00
 #define VA_HALF_INTENSITY	0x02
 #define VA_BLINK			0x04
 #define VA_REVERSE			0x08
