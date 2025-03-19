@@ -24,6 +24,8 @@
 
 #define LOWER_CASE  9
 
+#define PASSTHROUGH	10
+
 #define PAGE        27
 
 #define CLK_IN      20

@@ -1,8 +1,6 @@
 
 #include "CT-1024.h"
 
-#define AC30_CMD	10
-
 #define REC_OFF     16
 #define REC_ON      17
 #define RDR_OFF     18
@@ -11,7 +9,7 @@
 //									         12345678901234567890123456789012345678901234567890123456789012345678901234567890
 static wchar_t startupMessage[COLUMNS+1] = L"                    ******   SWTPC CT-1024 Mode   ******                        ";
 
-static volatile bool useAC30Commands = false;
+static volatile bool useAC30Commands = true;
 
 static void sendPulse(int pin)
 {
@@ -97,10 +95,7 @@ bool CT_1024::IsCommand(wchar_t c, bool isReceive)
 }
 
 void CT_1024::TerminalSetup()
-{
-	pinMode(AC30_CMD, INPUT_PULLUP);
-	useAC30Commands = digitalRead(AC30_CMD) == HIGH;
-	
+{	
 	pinMode(REC_OFF, OUTPUT);
 	digitalWrite(REC_OFF, HIGH);
 	
@@ -116,7 +111,6 @@ void CT_1024::TerminalSetup()
 
 void CT_1024::TerminalLoop1(int pins)
 {
-	useAC30Commands = (pins & (1 << AC30_CMD)) != 0;
 }
 
 wchar_t* CT_1024::StartupMessage()

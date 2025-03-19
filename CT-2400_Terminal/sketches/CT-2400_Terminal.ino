@@ -29,6 +29,8 @@ volatile bool setupComplete = false;
 
 volatile bool offlineMode = false;
 
+volatile bool passthroughMode = false;
+
 int baudRate = 300;
 
 bool isDebug = false;
@@ -1029,7 +1031,7 @@ void setup()
 	wrapVertical = digitalRead(SCROLL) == LOW;
 
 	pinMode(LOCAL_ECHO, INPUT_PULLUP);
-	offlineMode = digitalRead(LOCAL_ECHO) == HIGH;
+	offlineMode = digitalRead(LOCAL_ECHO) == LOW;
 
 	pinMode(LOWER_CASE, INPUT_PULLUP);
 	hasLowercase = digitalRead(LOWER_CASE) == HIGH;
@@ -1037,6 +1039,9 @@ void setup()
 	pinMode(PAGE, INPUT_PULLUP);
 	currentPageBuffer = digitalRead(PAGE) == HIGH ? 0 : 1;
 	newPageBuffer = currentPageBuffer;
+	
+	pinMode(PASSTHROUGH, INPUT_PULLUP);
+	passthroughMode = digitalRead(PASSTHROUGH) == LOW;
 	
 	pinMode(RESET, INPUT_PULLUP);
 	resetPushed = false;
@@ -1078,6 +1083,7 @@ void loop1()
 	wrapVertical = (pins & (1 << SCROLL)) == 0;
 	newPageBuffer = (pins & (1 << PAGE)) != 0 ? 0 : 1;
 	offlineMode = (pins & (1 << LOCAL_ECHO)) != 0;
+	passthroughMode = (pins & (1 << PASSTHROUGH)) == 0;
 	
 	terminal->TerminalLoop1(pins);
 }
@@ -1088,56 +1094,49 @@ void HandleSend()
 	// NOTE: available() seems to only return 1 in minicom
 	// plus there is a small delay between read() and 
 	// when available() is true again.
-	//if (Serial.available() >= 3)  
-	//{
-		if (Serial.peek() == 0x1B)
+	if (Serial.peek() == 0x1B)
+	{
+		wchar_t c = Serial.read();
+		delay(10);
+		if (Serial.available() && Serial.peek() == '[')
 		{
-			wchar_t c = Serial.read();
+			Serial.read();
 			delay(10);
-			if (Serial.available() && Serial.peek() == '[')
-			{
-				Serial.read();
-				delay(10);
 				
-				if (Serial.available())
+			if (Serial.available())
+			{
+				c = Serial.read();
+				switch (c)  // VT-100 Command to Follow
 				{
-					c = Serial.read();
-					switch (c)  // VT-100 Command to Follow
-					{
-					case 'A':
-					case 'B':
-					case 'C':
-					case 'D':
-						if (cursorOn)  // TODO: This doesn't work as expected
-							ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
-						break;
-					default:
-						ProcessSentByte(0x1B);
-						ProcessSentByte('[');
-						ProcessSentByte(c);
-						break;
-					}
-				}
-				else
-				{
+				case 'A':
+				case 'B':
+				case 'C':
+				case 'D':
+					if (cursorOn)  // TODO: This doesn't work as expected
+						ProcessSentByte(c - 'A' + ARROW_KEY_OFFSET);
+					break;
+				default:
 					ProcessSentByte(0x1B);
 					ProcessSentByte('[');
+					ProcessSentByte(c);
+					break;
 				}
 			}
 			else
 			{
-				ProcessSentByte(c);
+				ProcessSentByte(0x1B);
+				ProcessSentByte('[');
 			}
 		}
 		else
 		{
-			ProcessSentByte(Serial.read());
+			ProcessSentByte(c);
 		}
-	//}
-	//else
-	//{
-	//	ProcessSentByte(Serial.read());
-	//}
+	}
+	else
+	{
+		ProcessSentByte(Serial.read());
+	}
 }
 
 void loop() 
@@ -1149,7 +1148,8 @@ void loop()
 	hasLowercase = (pins & (1 << LOWER_CASE)) != 0;
 	wrapVertical = (pins & (1 << SCROLL)) == 0;
 	newPageBuffer = (pins & (1 << PAGE)) != 0 ? 0 : 1;
-	offlineMode = (pins & (1 << LOCAL_ECHO)) != 0;
+	offlineMode = (pins & (1 << LOCAL_ECHO)) == 0;
+	passthroughMode = (pins & (1 << PASSTHROUGH)) == 0;
 	
 	terminal->TerminalLoop1(pins);
 #endif
@@ -1163,35 +1163,29 @@ void loop()
 	{
 		SwapPages();
 	}
-
-//	if (Serial1.available())
-//	{
-//		wchar_t temp_buffer[BUFFER_SIZE];
-//		int count = min(BUFFER_SIZE, Serial1.available());
-//		
-//		for(int i = 0; i < count; ++i)
-//			temp_buffer[i] = Serial1.read();
-//		inputBuffer.insert(inputBuffer.cend(), temp_buffer, temp_buffer + count);
-//	}
 	
-	if (Serial.available()) 
-	{   	
-		HandleSend();
-	}
-	
-	if (Serial1.available())
+	if (passthroughMode)
 	{
-		ProcessReceivedByte(Serial1.read());
-	}
+		if (Serial.available()) 
+		{   	
+			Serial1.write(Serial.read());
+		}
 	
-//	if (!inputBuffer.empty())
-//	{
-//		int count = inputBuffer.size();
-//		for (int i = 0; i < count; ++i)	
-//		{	
-//			c = inputBuffer.front();
-//			inputBuffer.pop_front();
-//			ProcessReceivedByte(c);
-//		}
-//	}
+		if (Serial1.available())
+		{
+			Serial.write(Serial1.read());
+		}
+	}
+	else
+	{
+		if (Serial.available()) 
+		{   	
+			HandleSend();
+		}
+	
+		if (Serial1.available())
+		{
+			ProcessReceivedByte(Serial1.read());
+		}
+	}
 }
