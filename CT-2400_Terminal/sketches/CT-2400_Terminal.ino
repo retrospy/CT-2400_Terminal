@@ -94,7 +94,7 @@ mbchar wchar_to_utf8(wchar_t c) {
 	return result;
 }
 
-int getCurrentPage()
+int GetCurrentPage()
 {
 	return currentPageBuffer;
 }
@@ -138,6 +138,12 @@ void GetCurrentScreenPosition(int& v, int& h)
 	// ^[<v>;<h>R
 	v = response.substring(response.indexOf('[') + 1, response.indexOf(';')).toInt();
 	h = response.substring(response.indexOf(';') + 1, response.indexOf('R')).toInt();
+}
+
+void GetScreenPosition(int& v, int& h)
+{
+	h = currentPageBufferPosition[currentPageBuffer].h;
+	v = currentPageBufferPosition[currentPageBuffer].v;
 }
 
 void MoveCursor(int v, int h)
@@ -225,8 +231,10 @@ void WriteCharactorToCurrentPageBuffer(wchar_t c)
 bool CommandCursorRight()
 {
 	int v, h;
-	GetCurrentScreenPosition(v, h);
-  
+	//GetCurrentScreenPosition(v, h);
+	v = currentPageBufferPosition[currentPageBuffer].v;
+	h = currentPageBufferPosition[currentPageBuffer].h;
+	
 	if (wrapVertical && wrapHorizontal && h == COLUMNS && v == ROWS)
 	{
 		MoveCursorToHome();
@@ -259,8 +267,10 @@ bool CommandCursorRight()
 bool CommandCursorDown()
 {
 	int v, h;
-	GetCurrentScreenPosition(v, h);
-  
+	//GetCurrentScreenPosition(v, h);
+	v = currentPageBufferPosition[currentPageBuffer].v;
+	h = currentPageBufferPosition[currentPageBuffer].h;
+	
 	if (wrapVertical && v == ROWS)
 	{
 		MoveCursor(1, h);
@@ -281,8 +291,10 @@ bool CommandCursorLeft()
 {
 
 	int v, h;
-	GetCurrentScreenPosition(v, h);
-  
+	//GetCurrentScreenPosition(v, h);
+	v = currentPageBufferPosition[currentPageBuffer].v;
+	h = currentPageBufferPosition[currentPageBuffer].h;
+	
 	if (wrapHorizontal && COLUMNS == 1)
 	{
 		MoveCursor(v, COLUMNS);
@@ -302,8 +314,10 @@ bool CommandCursorLeft()
 bool CommandCursorUp()
 {
 	int v, h;
-	GetCurrentScreenPosition(v, h);
-  
+	//GetCurrentScreenPosition(v, h);
+	v = currentPageBufferPosition[currentPageBuffer].v;
+	h = currentPageBufferPosition[currentPageBuffer].h;
+	
 	if (wrapVertical && v == 1)
 	{
 		MoveCursor(ROWS, h);
@@ -346,8 +360,10 @@ bool CommandEraseToEOL()
 		Serial.printf("%c[K", 27);
 	
 		int v, h;
-		GetCurrentScreenPosition(v, h);
-	
+		//GetCurrentScreenPosition(v, h);
+		v = currentPageBufferPosition[currentPageBuffer].v;
+		h = currentPageBufferPosition[currentPageBuffer].h;
+		
 		for (int i = h; i <= COLUMNS; ++i)
 		{
 			pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = {' ', VA_NORMAL};
@@ -364,8 +380,10 @@ bool CommandEraseToEOF()
 		Serial.printf("%c[J", 27);
 	
 		int v, h;
-		GetCurrentScreenPosition(v, h);
-	
+		//GetCurrentScreenPosition(v, h);
+		v = currentPageBufferPosition[currentPageBuffer].v;
+		h = currentPageBufferPosition[currentPageBuffer].h;
+		
 		for (int i = h; i <= COLUMNS; ++i)
 			pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = {' ', VA_NORMAL};
 	
@@ -409,8 +427,10 @@ bool CommandEraseLine()
 		Serial.printf("%c[2K", 27);
 	
 		int v, h;
-		GetCurrentScreenPosition(v, h);
-	
+		//GetCurrentScreenPosition(v, h);
+		v = currentPageBufferPosition[currentPageBuffer].v;
+		h = currentPageBufferPosition[currentPageBuffer].h;
+		
 		for (int i = 0; i <= COLUMNS; ++i)
 			pageBuffer[currentPageBuffer][GenerateRealRowPosition(v)][i] = {' ', VA_NORMAL};
 	}
@@ -507,7 +527,9 @@ bool CommandStartVideoAttribute(byte attributes, int v, int h)
 bool CommandStartVideoAttribute(byte attributes)
 {
 	int v, h;
-	GetCurrentScreenPosition(v, h);
+	//GetCurrentScreenPosition(v, h);
+	v = currentPageBufferPosition[currentPageBuffer].v;
+	h = currentPageBufferPosition[currentPageBuffer].h;
 	
 	return CommandStartVideoAttribute(attributes, v, h);
 }
@@ -530,7 +552,9 @@ bool CommandDeleteLine()
 	
 	int v;
 	int h;
-	GetCurrentScreenPosition(v, h);
+	//GetCurrentScreenPosition(v, h);
+	v = currentPageBufferPosition[currentPageBuffer].v;
+	h = currentPageBufferPosition[currentPageBuffer].h;
 	
 	int deletedRow = GenerateRealRowPosition(v);
 
@@ -562,7 +586,9 @@ bool CommandInsertLine()
 {
 	int v;
 	int h;
-	GetCurrentScreenPosition(v, h);
+	//GetCurrentScreenPosition(v, h);
+	v = currentPageBufferPosition[currentPageBuffer].v;
+	h = currentPageBufferPosition[currentPageBuffer].h;
 	
 	for (int j = ROWS - 1; j >= v; --j)
 	{
@@ -597,35 +623,6 @@ bool CommandInsertLine()
 int g_keysToConsume = 0;
 std::vector<wchar_t> g_consumedKeys;
 bool(*g_keysConsumedCallback)(bool receive) = nullptr;
-
-bool ProcessVT100EscapeCode(bool receive)
-{
-	switch (g_consumedKeys[0])
-	{
-	case 'A':
-		CommandCursorUp();
-		break;
-	case 'B':
-		CommandCursorDown();
-		break;
-	case 'C':
-		CommandCursorRight();
-		break;
-	case 'D':
-		CommandCursorLeft();
-		break;
-	}
-	
-	return true;
-}
-
-bool CommandVT100EscapeCode()
-{
-	g_keysToConsume = 1;
-	g_keysConsumedCallback = ProcessVT100EscapeCode;
-	
-	return false;
-}
 
 void ProcessReceivedByte(wchar_t c)
 {
@@ -668,8 +665,10 @@ void ProcessReceivedByte(wchar_t c)
 		else if (wrapVertical && currentPageBufferPosition[currentPageBuffer].v == ROWS)
 		{
 			int v, h;
-			GetCurrentScreenPosition(v, h);
-
+			//GetCurrentScreenPosition(v, h);
+			v = currentPageBufferPosition[currentPageBuffer].v;
+			h = currentPageBufferPosition[currentPageBuffer].h;
+			
 			MoveCursor(1, h);
 			currentPageBufferPosition[currentPageBuffer].v = 1;
 		}
@@ -688,7 +687,9 @@ void ProcessReceivedByte(wchar_t c)
 	else if (c == TAB)
 	{
 		int v, h;
-		GetCurrentScreenPosition(v, h);
+		//GetCurrentScreenPosition(v, h);
+		v = currentPageBufferPosition[currentPageBuffer].v;
+		h = currentPageBufferPosition[currentPageBuffer].h;
 		
 		bool wrapped = false;
 		h = terminal->NextTabStop(h);
@@ -696,6 +697,7 @@ void ProcessReceivedByte(wchar_t c)
 		if (h > 1)
 		{
 			MoveCursor(v, h);
+			currentPageBufferPosition[currentPageBuffer].h = h;
 		}
 		else
 		{
@@ -729,8 +731,10 @@ void ProcessReceivedByte(wchar_t c)
 	if (c >= 0x20 && c <= 0x7f)
 	{
 		int v, h;
-		GetCurrentScreenPosition(v, h);
-
+		//GetCurrentScreenPosition(v, h);
+		v = currentPageBufferPosition[currentPageBuffer].v;
+		h = currentPageBufferPosition[currentPageBuffer].h;
+		
 		wchar_t charToDisplay = terminal->TransformReceived(c);
 
 		Serial.write(wchar_to_utf8(hasLowercase ? charToDisplay : toupper(charToDisplay)).utf8);
@@ -803,6 +807,7 @@ std::deque<wchar_t> inputBuffer;
 void initScreen()
 {
 	CommandCursorOn();
+	cursorOn = true;
 	MoveCursorToHome();
 	EraseToEOF();
 	
@@ -853,8 +858,6 @@ void initPageBuffer()
 
 void reinit()
 {
-	inputBuffer.clear();
-	
 	terminal->AssignCommands();
 	
 	int baudRate = GetBaudRate();
@@ -868,6 +871,13 @@ void reinit()
 	while (!Serial) ;
 	
 	initScreen();
+}
+
+bool CommandReInit()
+{
+	reinit();
+	
+	return true;
 }
 
 static FlashConfig config;
@@ -926,10 +936,19 @@ static void SetTerminalType(int terminalType, bool callingFromSetup)
 
 }
 
-static void ToggleTerminalType()
+bool ToggleTerminalType()
 {
 	config.TerminalType = (config.TerminalType + 1) % 2;
 	SetTerminalType(config.TerminalType, false);
+	
+	return false;
+}
+
+bool ToggleDebugFlag()
+{
+	isDebug = !isDebug;
+	
+	return false;
 }
 
 void ProcessSentByte(wchar_t c)

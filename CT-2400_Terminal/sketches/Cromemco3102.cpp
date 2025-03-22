@@ -174,7 +174,6 @@ void Cromemco3102::AssignCommands()
 	CommandAssignment['e'] = CommandNormalVideo;
 	CommandAssignment['l'] = CommandStartBlink;
 	CommandAssignment['m'] = CommandNormalVideo;
-	//CommandAssignment['['] = CommandVT100EscapeCode;	
 }
 
 static bool ProcessEscapeCode(bool isReceive)
@@ -225,8 +224,9 @@ bool Cromemco3102::ProcessCommand(wchar_t& c, bool receive)
 		{
 			int h, v;
 		
-			GetCurrentScreenPosition(v, h);
-			CommandMoveCursor(v, h - 1);
+			GetScreenPosition(v, h);
+			if (h > 1)
+				CommandMoveCursor(v, h - 1);
 		}
 		else if (c == ENQ)
 		{
@@ -236,6 +236,8 @@ bool Cromemco3102::ProcessCommand(wchar_t& c, bool receive)
 			Serial1.write('1');
 			Serial1.write('0');
 			Serial1.write('2');
+			Serial1.write(CR);
+			Serial1.write(LF);
 		}
 		return true;
 	}

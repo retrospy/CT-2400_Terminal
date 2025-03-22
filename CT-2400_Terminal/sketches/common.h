@@ -69,11 +69,12 @@ extern bool CommandNormalVideo();
 extern bool CommandStartBlink();
 extern bool CommandStartVideoAttribute(byte attributes);
 extern bool CommandMoveCursor(int v, int h);
-extern int getCurrentPage();
-
+extern int GetCurrentPage();
 extern bool IsLocalEchoOn();
-extern void TerminalSetup();
-extern void GetCurrentScreenPosition(int& v, int& h);
+extern void GetScreenPosition(int& v, int& h);
+extern bool CommandReInit();
+extern bool ToggleDebugFlag();
+extern bool ToggleTerminalType();
 
 extern int g_keysToConsume;
 extern std::vector<wchar_t> g_consumedKeys;
